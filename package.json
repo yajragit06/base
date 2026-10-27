@@ -1,0 +1,26 @@
+{
+  "name": "cms",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "turbo test --concurrency=1",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down",
+    "db:generate": "pnpm --filter @cms/db generate",
+    "db:migrate": "turbo run migrate --filter=@cms/db"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.3",
+    "turbo": "^2.11.10",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,6 +1,6 @@
 # <name> CMS - Project Overview
 
-<!-- blueprint:source-hash 1c6e724e14251344494dfe7af734a83b44e0e43f1db5a3b2363aa15d71a1cb85 -->
+<!-- blueprint:source-hash ca0011eeff6cacfe85011ede30bafbe21223834dad69afc40a87632fcd3c3702 -->
 
 > An MIT-licensed, TypeScript, API-first CMS framework with MODX's resource tree, a
 > schema-driven admin for editors, and permissioned AI agents over MCP; paid add-ons
@@ -187,10 +187,10 @@ and `audit_log` shapes; later features add columns, never reshape them.
 
 ## Tech stack
 
-- **TypeScript (strict), Node.js LTS, pnpm + Turborepo** (monorepo assumed) - all packages.
-- **API server: TODO** (Fastify or Hono) - Delivery, Admin and MCP-over-HTTP.
+- **TypeScript (strict), Node.js 22, pnpm + Turborepo, Biome** - all packages.
+- **Fastify** - API server for Delivery, Admin and MCP-over-HTTP.
 - **PostgreSQL 16 + pgvector + RLS** - content, tree, vectors, isolation.
-- **ORM: TODO** (Drizzle suggested) - forward-only migrations compatible with the previous release.
+- **Drizzle + pg** - ORM; forward-only migrations compatible with the previous release.
 - **Zod** - fields, commands, API input, AI output.
 - **Redis + BullMQ** - scheduling, hooks, webhooks, embeddings, variants, purges.
 - **Next.js + React** - admin app and site starter; UI kit TODO (shadcn/ui suggested); rich text TODO (Tiptap or Lexical) stored as JSON.
@@ -237,7 +237,7 @@ width up; WCAG 2.1 AA. Editor creates and publishes a page in ≤ 2 minutes.
 
 > TODO: multi-site is a free v1 P0 (D3) and also listed in the paid Team tier.
 > TODO: alt text required before publish; allow marking images decorative?
-> TODO: API framework, ORM, rich text editor and UI kit.
+> TODO: rich text editor and UI kit.
 > TODO: milestone weeks are reconstructed; the PRD's milestone diagram was missing.
 > From the PRD: pilot site for M1-M2; paid-code licence model (decide before M3);
 > product name and domain; agent auto-publishing in v1; launch at beta or GA; Cloud
