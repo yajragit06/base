@@ -3,6 +3,7 @@
 **From build-plan:** feature 2
 **Build attempt:** 1
 **Branch:** feature/sites-and-the-content-tree
+**Status:** verified
 
 ## Goal
 
@@ -45,32 +46,32 @@ and offers the pull request.
 
 ## Build steps
 
-- [ ] 1. **Test harness for `@cms/db`.** Add Vitest and a `test` script to `packages/db`,
+- [x] 1. **Test harness for `@cms/db`.** Add Vitest and a `test` script to `packages/db`,
   plus a helper that applies migrations to `TEST_DATABASE_URL` once per run and truncates
   every table before each test. Tests fail with a clear message when `TEST_DATABASE_URL`
   is unset.
   **Done when:** a smoke test connects and runs, `pnpm test` runs it through Turborepo,
   and it fails loudly without `TEST_DATABASE_URL`.
-- [ ] 2. **Sites and domains.** Tables, generated migration, `createSite`, `addDomain`,
+- [x] 2. **Sites and domains.** Tables, generated migration, `createSite`, `addDomain`,
   `listSites`, `findSiteByHost`.
   **Done when:** tests prove valid sites and domains are stored; invalid time zone,
   invalid or duplicate locales, a default locale missing from `locales`, a malformed
   host, a host already used by any site, and a second primary domain on one site are
   each rejected with the documented error code; host lookup is case-insensitive.
-- [ ] 3. **Entries table and row-level security.** `entries` table, a custom migration
+- [x] 3. **Entries table and row-level security.** `entries` table, a custom migration
   creating the `cms_app` role, its grants, and the RLS policy (enabled and forced), and
   `withSite()`.
   **Done when:** tests prove that inside `withSite(siteA)` a raw `SELECT * FROM entries`
   returns only site A's rows, an insert with site B's id is rejected by the policy, and
   with no site set no rows are visible; `pnpm db:generate` reports no drift.
-- [ ] 4. **Creating and reading entries.** `createEntry`, `getEntry`, `getEntryByUri`,
+- [x] 4. **Creating and reading entries.** `createEntry`, `getEntry`, `getEntryByUri`,
   `listChildren`.
   **Done when:** tests prove URI and path are computed for top-level and nested entries,
   new entries are appended after their siblings, children list in sort order, a duplicate
   URI returns `uri_taken`, a parent in another site returns `parent_not_found`, invalid
   slugs and type keys are rejected, and every read with site B's id finds nothing of
   site A's (cross-site tests).
-- [ ] 5. **Concurrency and docs.** Prove concurrent `createEntry` calls under one parent
+- [x] 5. **Concurrency and docs.** Prove concurrent `createEntry` calls under one parent
   get distinct sort orders; add the new functions and test setup to `AGENTS.md`.
   **Done when:** a test running 10 parallel creates under one parent gets sort orders
   0-9 with no duplicates, and `pnpm verify` passes.
