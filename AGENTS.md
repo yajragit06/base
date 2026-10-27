@@ -26,7 +26,9 @@ The product name is undecided: packages use the placeholder scope `@cms/*`.
   `app.inject`); `src/server.ts` listens.
 - `apps/admin` Next.js (App Router) admin app.
 - `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`.
-- Further apps and packages (worker, schema, core, SDK, CLI, MCP, site starter) are
+- `packages/schema` `defineContentType`, `defineBlock`, the `field` builders, `EntryData`
+  and `validateEntry` (field-level errors with stable codes).
+- Further apps and packages (worker, core, SDK, CLI, MCP, site starter) are
   added by the build-plan feature that first needs them.
 
 ### Rules that must not break

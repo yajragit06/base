@@ -3,6 +3,7 @@
 **From build-plan:** feature 1
 **Build attempt:** 1
 **Branch:** feature/content-type-definitions
+**Status:** verified
 
 ## Goal
 
@@ -44,7 +45,7 @@ and, with `git.landing: "pull-request"`, offers to push the branch and open a PR
 
 ## Build steps
 
-- [ ] 1. **Package and first vertical slice.** Create `packages/schema` with `zod` (^4.6)
+- [x] 1. **Package and first vertical slice.** Create `packages/schema` with `zod` (^4.6)
   as its only runtime dependency, `build`/`typecheck`/`test` scripts matching
   `packages/db` and `apps/api`, and Vitest. Implement `defineContentType()`, `field.text()`,
   `field.number()`, `validateEntry()` and the error mapping (see Data / contracts).
@@ -52,22 +53,22 @@ and, with `git.landing: "pull-request"`, offers to push the branch and open a PR
   wrong type, too short/long, out of range and unknown keys return the documented codes
   and paths, defaults fill missing values, and `pnpm verify` passes with the new package
   picked up by Turborepo.
-- [ ] 2. **Remaining scalar fields.** `field.boolean()`, `field.date()`,
+- [x] 2. **Remaining scalar fields.** `field.boolean()`, `field.date()`,
   `field.datetime()`, `field.select()`, `field.slug()`.
   **Done when:** each type has tests for a valid value, a wrong type and its own rule
   (date format, offset required on date/time, option not in list, single and `multiple`
   selects, slug pattern), and `pnpm verify` passes.
-- [ ] 3. **Reference and document fields.** `field.media()`, `field.entry()`,
+- [x] 3. **Reference and document fields.** `field.media()`, `field.entry()`,
   `field.richText()`, `field.json()` (with an optional caller-supplied Zod schema).
   **Done when:** tests cover valid and invalid values for each, including a custom Zod
   schema on `json` whose failure surfaces as a field-level error at the right path, and
   `pnpm verify` passes.
-- [ ] 4. **Composite fields.** `field.repeater()`, `defineBlock()`, `field.blocks()` and
+- [x] 4. **Composite fields.** `field.repeater()`, `defineBlock()`, `field.blocks()` and
   `field.seo()`.
   **Done when:** tests prove nested errors carry full paths (for example
   `["sections", 1, "title"]`), item count limits on repeaters and block lists, an unknown
   block type returns `unknown_block`, nested defaults apply, and `pnpm verify` passes.
-- [ ] 5. **Definition checks and type inference.** `defineContentType()` and
+- [x] 5. **Definition checks and type inference.** `defineContentType()` and
   `defineBlock()` throw on invalid keys, empty field sets, duplicate block keys, a
   default that fails its own field's validation, and `localized` on a nested field.
   Add compile-time type tests (`expectTypeOf`) for `EntryData` across every field type,
@@ -152,6 +153,7 @@ type ValidationResult<T> = { ok: true; data: T } | { ok: false; errors: FieldErr
   (including non-object input, which returns one `invalid_type` error with path `[]`),
   and reports every error, not just the first.
 - `path` is the full path from the entry root. `unknown_field` points at the unknown key.
+  `unknown_block` points at the item's `type` key (for example `["sections", 0, "type"]`).
 - `message` is an English sentence for developers and logs; clients key on `code`.
 - `invalid` covers custom Zod refinements and anything without a specific code.
 - On success, `data` has defaults applied and is a new object; the input is not mutated.
