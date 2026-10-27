@@ -29,14 +29,20 @@ order are in `blueprint/context/project-overview.md`; the full plan is
   Routes live in `src/routes/`.
 - `apps/admin` Next.js (App Router) admin app.
 - `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`;
-  sites and domains (`sites.ts`), the entry tree (`entries.ts`), `DbError` codes, and
+  sites and domains (`sites.ts`), the entry tree (`entries.ts`), immutable versions
+  (`versions.ts`: one linear chain per entry and locale, the latest is the one nothing is
+  based on; a trigger rejects deletes and every change but `status`), `DbError` codes, and
   `withSite()`, which every site-scoped query runs inside: it switches to the `cms_app`
   role so row-level security applies, even when connected as a superuser.
 - `packages/schema` `defineContentType`, `defineBlock`, the `field` builders, `EntryData`
   and `validateEntry` (field-level errors with stable codes).
 - `packages/core` the write path: `defineCommand` and `runCommand` (Zod input, an
   `Authorizer` check, then the change and its `audit_log` row in one transaction),
-  `CommandError`, and the commands `site.create`, `site.addDomain`, `entry.create`. Every
+  `CommandError`, and the commands `site.create`, `site.addDomain`, `entry.create` (records
+  the actor as creator) and `entry.saveDraft` (validates data against the entry's content
+  type, appends a draft, refuses a stale base with `version_conflict`; Authors may save
+  only on entries they created). Content types reach commands as
+  `CommandDeps.contentTypes`, available to handlers as `ctx.contentTypes`. Every
   new write is a command run through `runCommand`; the `@cms/db` write functions are its
   building blocks, not a second write path. `roleAuthorizer(db)` checks the user's role on
   the command's site against `PERMISSIONS` (`src/permissions.ts`): system actors are

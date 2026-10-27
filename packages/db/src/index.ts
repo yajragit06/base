@@ -13,8 +13,8 @@ export {
 } from "./entries.js";
 export { DbError, type DbErrorCode } from "./errors.js";
 export { runMigrations, truncateAllTables } from "./migrations.js";
-export type { AuditEntry, Domain, Entry, Membership, Site, User } from "./schema.js";
-export { ROLES, type Role } from "./schema.js";
+export type { AuditEntry, Domain, Entry, Membership, Site, User, Version } from "./schema.js";
+export { ROLES, type Role, VERSION_STATUSES, type VersionStatus } from "./schema.js";
 export { type Executor, type SiteTx, withSite, withUser } from "./site-scope.js";
 export { addDomain, createSite, findSiteByHost, listSites, type NewSite } from "./sites.js";
 export {
@@ -29,6 +29,14 @@ export {
   setMembershipInTx,
   type UserMembership,
 } from "./users.js";
+export {
+  appendVersionInTx,
+  getLatestVersion,
+  getLatestVersionInTx,
+  getVersion,
+  listVersions,
+  type NewVersion,
+} from "./versions.js";
 export { schema };
 
 export function createDb(connectionString: string) {

@@ -7,6 +7,7 @@ import type { Authorizer } from "./authorize.js";
  */
 export const PERMISSIONS: Readonly<Record<string, readonly Role[]>> = {
   "entry.create": ["owner", "admin", "editor", "author"],
+  "entry.saveDraft": ["owner", "admin", "editor", "author"],
   "site.addDomain": ["owner", "admin"],
   "membership.grant": ["owner", "admin"],
 };

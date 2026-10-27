@@ -13,7 +13,10 @@ export type DbErrorCode =
   | "uri_taken"
   | "uri_too_long"
   | "user_not_found"
-  | "last_owner";
+  | "last_owner"
+  | "entry_not_found"
+  | "version_not_found"
+  | "version_conflict";
 
 /** An expected input or conflict error with a stable code; Feature 3 maps these to API errors. */
 export class DbError extends Error {
