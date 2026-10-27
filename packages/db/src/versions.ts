@@ -74,16 +74,14 @@ export async function getVersion(db: Db, siteId: string, id: string): Promise<Ve
   });
 }
 
-/** The newest version of one locale of an entry: the one nothing is based on. */
-export async function getLatestVersionInTx(
-  tx: Executor,
-  siteId: string,
-  entryId: string,
-  locale: string,
-): Promise<Version | null> {
-  if (!isUuid(siteId) || !isUuid(entryId)) return null;
+/**
+ * The query behind `getLatestVersionInTx`, exported for its query-plan test. The successor
+ * check names the entry and locale so it can use `versions_chain_key` instead of scanning
+ * every version in the site.
+ */
+export function latestVersionQuery(tx: Executor, siteId: string, entryId: string, locale: string) {
   const next = alias(versions, "next");
-  const [version] = await tx
+  return tx
     .select()
     .from(versions)
     .where(
@@ -95,10 +93,28 @@ export async function getLatestVersionInTx(
           tx
             .select({ one: sql`1` })
             .from(next)
-            .where(and(eq(next.siteId, siteId), eq(next.basedOnVersionId, versions.id))),
+            .where(
+              and(
+                eq(next.siteId, siteId),
+                eq(next.entryId, entryId),
+                eq(next.locale, locale),
+                eq(next.basedOnVersionId, versions.id),
+              ),
+            ),
         ),
       ),
     );
+}
+
+/** The newest version of one locale of an entry: the one nothing is based on. */
+export async function getLatestVersionInTx(
+  tx: Executor,
+  siteId: string,
+  entryId: string,
+  locale: string,
+): Promise<Version | null> {
+  if (!isUuid(siteId) || !isUuid(entryId)) return null;
+  const [version] = await latestVersionQuery(tx, siteId, entryId, locale);
   return version ?? null;
 }
 

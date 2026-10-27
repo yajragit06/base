@@ -68,6 +68,16 @@ feature adds a migration, persisted user data and an authorization rule, so the
 - [x] 3. **Docs and final gate.** Document the registry dependency, `entry.saveDraft` and
   the version rules in `AGENTS.md`, and add the new error codes to the layout notes.
   **Done when:** `pnpm verify` passes and the CI drift check is clean.
+- [x] 4. **Repair review findings F-16, F-17 and F-13 (for `entry.saveDraft`).** Correlate
+  the latest-version subquery on entry and locale so it uses the chain index; list every
+  code `entry.saveDraft` can return in `AGENTS.md`; and in the save's own transaction refuse
+  a user whose current role no longer holds `entry.saveDraft` (demoted or removed after the
+  authorizer ran) with `forbidden`.
+  **Done when:** an `EXPLAIN` test shows the latest-version query no longer scans every
+  version in the site; a test demotes an Editor to Viewer (and removes another) between the
+  authorizer and the save and gets `forbidden` with no version or audit row; a
+  `listVersions` test covers limit clamping; F-16 and F-17 are marked `fixed` and F-13's
+  `entry.saveDraft` part is noted as repaired; and `pnpm verify` passes.
 
 ## Files / areas
 

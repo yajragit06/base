@@ -10,6 +10,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { defineCommand } from "../command.js";
 import { CommandError } from "../errors.js";
+import { PERMISSIONS } from "../permissions.js";
 
 // Until Feature 18 lets content types declare a version, every schema is version 1.
 const SCHEMA_VERSION = 1;
@@ -40,9 +41,13 @@ export const saveDraftCommand = defineCommand({
     if (!entry) throw new DbError("entry_not_found", "Entry not found.");
 
     if (actor.type === "user") {
+      // Re-read under the entry lock: a role removed after the authorizer ran no longer counts.
       const membership = await getMembershipInTx(tx, input.siteId, actor.id);
+      if (!membership || !PERMISSIONS["entry.saveDraft"]?.includes(membership.role)) {
+        throw new CommandError("forbidden", "You do not have permission to do this.");
+      }
       const own = entry.createdByType === "user" && entry.createdById === actor.id;
-      if (membership?.role === "author" && !own) {
+      if (membership.role === "author" && !own) {
         throw new CommandError("forbidden", "Authors can only edit entries they created.");
       }
     }
