@@ -25,7 +25,10 @@ The product name is undecided: packages use the placeholder scope `@cms/*`.
 - `apps/api` Fastify API. `src/app.ts` builds the app (`buildApp`, testable with
   `app.inject`); `src/server.ts` listens.
 - `apps/admin` Next.js (App Router) admin app.
-- `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`.
+- `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`;
+  sites and domains (`sites.ts`), the entry tree (`entries.ts`), `DbError` codes, and
+  `withSite()`, which every site-scoped query runs inside: it switches to the `cms_app`
+  role so row-level security applies, even when connected as a superuser.
 - `packages/schema` `defineContentType`, `defineBlock`, the `field` builders, `EntryData`
   and `validateEntry` (field-level errors with stable codes).
 - Further apps and packages (worker, core, SDK, CLI, MCP, site starter) are
@@ -369,7 +372,9 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
 - Production servers: `pnpm --filter @cms/api start`, `pnpm --filter @cms/admin start`
 - Typecheck: `pnpm typecheck`
 - Lint: `pnpm lint` (Biome); format and safe fixes: `pnpm format`
-- Test: `pnpm test` (Vitest; suites run one at a time)
+- Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db` tests need
+  `TEST_DATABASE_URL` exported (a disposable database: tests truncate every table) and
+  a database user allowed to create roles.
 - Verify: `pnpm verify` (typecheck, lint, test, then build)
 - Migrations: `pnpm db:generate` after editing `packages/db/src/schema.ts` (commit the
   generated migration), `pnpm db:migrate` to apply
