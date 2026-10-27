@@ -1,7 +1,7 @@
 import type { DbErrorCode } from "@cms/db";
 import type { FieldError } from "@cms/schema";
 
-export type CommandErrorCode = "invalid_input" | "forbidden" | DbErrorCode;
+export type CommandErrorCode = "invalid_input" | "forbidden" | "unknown_content_type" | DbErrorCode;
 
 /** An expected command failure with a stable code; the API maps codes to responses. */
 export class CommandError extends Error {

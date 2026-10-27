@@ -12,11 +12,12 @@ export const createEntryCommand = defineCommand({
     typeKey: z.string(),
   }),
   siteId: (input) => input.siteId,
-  handler: async (tx, input) => {
+  handler: async (tx, input, { actor }) => {
     const entry = await createEntryInTx(tx, input.siteId, {
       parentId: input.parentId,
       slug: input.slug,
       typeKey: input.typeKey,
+      createdBy: { type: actor.type, id: actor.id },
     });
     return {
       result: entry,

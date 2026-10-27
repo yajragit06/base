@@ -18,6 +18,7 @@ const base = { timeZone: "UTC", defaultLocale: "en", locales: ["en"] };
 // has to be made deliberately in both places.
 const expected: Record<string, Role[]> = {
   "entry.create": ["owner", "admin", "editor", "author"],
+  "entry.saveDraft": ["owner", "admin", "editor", "author"],
   "site.addDomain": ["owner", "admin"],
   "membership.grant": ["owner", "admin"],
 };

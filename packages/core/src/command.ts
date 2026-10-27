@@ -1,5 +1,5 @@
 import { type Db, DbError, type Executor, insertAudit, withSite } from "@cms/db";
-import { fieldErrorsFromZod } from "@cms/schema";
+import { type ContentType, fieldErrorsFromZod } from "@cms/schema";
 import { sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Actor, Authorizer } from "./authorize.js";
@@ -16,6 +16,8 @@ export interface AuditRecord {
 export interface CommandContext {
   actor: Actor;
   siteId: string | undefined;
+  /** The install's content types by key (empty when `CommandDeps.contentTypes` is absent). */
+  contentTypes: ReadonlyMap<string, ContentType>;
 }
 
 export interface Command<I, R> {
@@ -43,6 +45,17 @@ export function defineCommand<S extends z.ZodType, R>(def: {
 export interface CommandDeps {
   db: Db;
   authorize: Authorizer;
+  /** The content types defined in code; commands that read or write entry data need them. */
+  contentTypes?: readonly ContentType[];
+}
+
+function contentTypeMap(types: readonly ContentType[] = []): Map<string, ContentType> {
+  const map = new Map<string, ContentType>();
+  for (const type of types) {
+    if (map.has(type.key)) throw new Error(`Content type "${type.key}" is defined twice.`);
+    map.set(type.key, type);
+  }
+  return map;
 }
 
 /**
@@ -56,6 +69,7 @@ export async function runCommand<I, R>(
   rawInput: unknown,
 ): Promise<R> {
   if (actor.id === "") throw new Error("A command needs an actor id.");
+  const contentTypes = contentTypeMap(deps.contentTypes);
   const parsed = command.input.safeParse(rawInput, { reportInput: true });
   if (!parsed.success) {
     throw new CommandError(
@@ -71,7 +85,7 @@ export async function runCommand<I, R>(
   }
 
   const execute = async (tx: Executor) => {
-    const { result, audit } = await command.handler(tx, input, { actor, siteId });
+    const { result, audit } = await command.handler(tx, input, { actor, siteId, contentTypes });
     const auditSiteId = siteId ?? audit.siteId;
     if (auditSiteId === undefined) {
       throw new Error(`Command ${command.name} returned no site for its audit row.`);

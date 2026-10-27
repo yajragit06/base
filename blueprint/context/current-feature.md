@@ -3,7 +3,7 @@
 **From build-plan:** feature 5
 **Build attempt:** 1
 **Branch:** feature/drafts-and-immutable-versions
-**Status:** draft
+**Status:** verified
 
 ## Goal
 
@@ -45,7 +45,7 @@ feature adds a migration, persisted user data and an authorization rule, so the
 
 ## Build steps
 
-- [ ] 1. **Versions table and entry creator.** Schema, generated migration and a custom
+- [x] 1. **Versions table and entry creator.** Schema, generated migration and a custom
   migration for row-level security and the immutability trigger. Add the creator columns to
   `entries` and have `createEntryInTx` take and store the creator. Data-access functions:
   `appendVersionInTx`, `getVersion`, `getLatestVersion`, `listVersions`.
@@ -54,7 +54,7 @@ feature adds a migration, persisted user data and an authorization rule, so the
   and cannot be inserted inside `withSite`; a second root or a second child of the same
   version for one entry and locale fails with `version_conflict`; a base version from
   another entry or locale is refused; and there is no migration drift.
-- [ ] 2. **`entry.saveDraft` command.** Add `contentTypes` to `CommandDeps` and the
+- [x] 2. **`entry.saveDraft` command.** Add `contentTypes` to `CommandDeps` and the
   context handlers receive; add the permission row; implement the rules below.
   `entry.create` records the actor as creator.
   **Done when:** tests prove a valid save returns a draft with the right schema version,
@@ -65,7 +65,7 @@ feature adds a migration, persisted user data and an authorization rule, so the
   their own entry but gets `forbidden` on someone else's or a creator-less entry, while an
   Editor saves on both; a Viewer, an agent and a non-member are refused; two concurrent
   saves on the same base produce one version and one `version_conflict`.
-- [ ] 3. **Docs and final gate.** Document the registry dependency, `entry.saveDraft` and
+- [x] 3. **Docs and final gate.** Document the registry dependency, `entry.saveDraft` and
   the version rules in `AGENTS.md`, and add the new error codes to the layout notes.
   **Done when:** `pnpm verify` passes and the CI drift check is clean.
 

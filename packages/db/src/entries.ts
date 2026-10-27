@@ -16,6 +16,8 @@ export interface NewEntry {
   parentId?: string | null;
   slug: string;
   typeKey: string;
+  /** Who created the entry; Authors may later save drafts only on their own entries. */
+  createdBy?: { type: "user" | "agent" | "system"; id: string };
 }
 
 function assertSiteId(siteId: string): void {
@@ -97,6 +99,8 @@ export async function createEntryInTx(
         uri,
         path,
         typeKey: input.typeKey,
+        createdByType: input.createdBy?.type ?? null,
+        createdById: input.createdBy?.id ?? null,
       })
       .returning();
     if (!entry) throw new Error("Insert returned no entry.");
