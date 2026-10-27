@@ -10,7 +10,7 @@ is a pre-build step done before Feature 1, not a feature.
 
 ## M0 - Foundations (weeks 1-3)
 
-- [ ] 1. **Content type definitions** - `defineContentType()` with Zod fields and the built-in field types produces TS types and API validation with field-level errors [A1, FR-2.1, FR-2.2]
+- [x] 1. **Content type definitions** - `defineContentType()` with Zod fields and the built-in field types produces TS types and API validation with field-level errors [A1, FR-2.1, FR-2.2]
 - [ ] 2. **Sites and the content tree** - sites with domains and locales; entries stored as a per-site tree with parent, sort order, slug and computed URI [FR-1.1]
 - [ ] 3. **Typed commands and audit log** - every write is a Zod-validated command with a permission check and an audit entry (user, agent or system) in the same transaction [FR-4.2, FR-6.3]
 - [ ] 4. **Sign-in and roles** - Clerk sign-in behind an auth adapter; Owner, Admin, Editor, Author, Viewer per site, enforced in the core [FR-6.1, FR-6.2]
