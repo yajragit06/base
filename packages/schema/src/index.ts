@@ -13,6 +13,7 @@ export {
 export {
   type FieldError,
   type FieldErrorCode,
+  fieldErrorsFromZod,
   type ValidationResult,
   validateEntry,
 } from "./validate.js";

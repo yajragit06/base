@@ -30,7 +30,15 @@ export function validateEntry<T extends ContentType>(
   if (result.success) {
     return { ok: true, data: structuredClone(result.data) as EntryData<T> };
   }
-  return { ok: false, errors: result.error.issues.flatMap(toFieldErrors) };
+  return { ok: false, errors: fieldErrorsFromZod(result.error) };
+}
+
+/**
+ * Field-level errors for a failed Zod parse. Parse with `{ reportInput: true }` so a missing
+ * value is reported as `required` rather than `invalid_type`.
+ */
+export function fieldErrorsFromZod(error: z.ZodError): FieldError[] {
+  return error.issues.flatMap(toFieldErrors);
 }
 
 function toFieldErrors(issue: z.core.$ZodIssue): FieldError[] {
