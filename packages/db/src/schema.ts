@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -65,6 +67,30 @@ export const entries = pgTable(
   ],
 );
 
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "restrict" }),
+    actorType: text("actor_type").notNull(),
+    actorId: text("actor_id").notNull(),
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    diff: jsonb("diff").notNull(),
+    ai: jsonb("ai"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("audit_log_actor_type_check", sql`${t.actorType} IN ('user', 'agent', 'system')`),
+    check("audit_log_actor_id_check", sql`${t.actorId} <> ''`),
+    index("audit_log_site_created_idx").on(t.siteId, t.createdAt),
+  ],
+);
+
 export type Site = typeof sites.$inferSelect;
 export type Domain = typeof domains.$inferSelect;
 export type Entry = typeof entries.$inferSelect;
+export type AuditEntry = typeof auditLog.$inferSelect;

@@ -15,6 +15,20 @@
       "when": 1793088557339,
       "tag": "0001_entries_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793090991679,
+      "tag": "0002_unique_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793090993117,
+      "tag": "0003_audit_log_append_only_and_rls",
+      "breakpoints": true
     }
   ]
 }

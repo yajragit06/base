@@ -1,7 +1,13 @@
 import { sql } from "drizzle-orm";
+import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
+import type { PgDatabase } from "drizzle-orm/pg-core";
 import type { Db } from "./index.js";
+import type * as schema from "./schema.js";
 
 export type SiteTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** A database handle or an open transaction; write functions accept either. */
+export type Executor = PgDatabase<NodePgQueryResultHKT, typeof schema>;
 
 /**
  * Runs `fn` in a transaction scoped to one site. Row-level security on tenant tables only

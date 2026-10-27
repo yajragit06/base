@@ -31,7 +31,13 @@ The product name is undecided: packages use the placeholder scope `@cms/*`.
   role so row-level security applies, even when connected as a superuser.
 - `packages/schema` `defineContentType`, `defineBlock`, the `field` builders, `EntryData`
   and `validateEntry` (field-level errors with stable codes).
-- Further apps and packages (worker, core, SDK, CLI, MCP, site starter) are
+- `packages/core` the write path: `defineCommand` and `runCommand` (Zod input, an
+  `Authorizer` check, then the change and its `audit_log` row in one transaction),
+  `CommandError`, and the commands `site.create`, `site.addDomain`, `entry.create`. Every
+  new write is a command run through `runCommand`; the `@cms/db` write functions are its
+  building blocks, not a second write path. The default authorizer is `denyAll` until
+  roles exist (Feature 4).
+- Further apps and packages (worker, SDK, CLI, MCP, site starter) are
   added by the build-plan feature that first needs them.
 
 ### Rules that must not break
@@ -372,7 +378,7 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
 - Production servers: `pnpm --filter @cms/api start`, `pnpm --filter @cms/admin start`
 - Typecheck: `pnpm typecheck`
 - Lint: `pnpm lint` (Biome); format and safe fixes: `pnpm format`
-- Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db` tests need
+- Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db` and `@cms/core` tests need
   `TEST_DATABASE_URL` exported (a disposable database: tests truncate every table) and
   a database user allowed to create roles.
 - Database user: the app must connect as the same user that runs `pnpm db:migrate`; the

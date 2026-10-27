@@ -3,6 +3,7 @@
 **From build-plan:** feature 3
 **Build attempt:** 1
 **Branch:** feature/typed-commands-and-audit-log
+**Status:** verified
 
 ## Goal
 
@@ -43,32 +44,32 @@ This feature changes a security boundary and adds a migration, so the configured
 
 ## Build steps
 
-- [ ] 1. **Core package and the command runner.** Create `packages/core` (built and tested
+- [x] 1. **Core package and the command runner.** Create `packages/core` (built and tested
   like `@cms/schema`), the actor type, `defineCommand()`, `runCommand()` with Zod input
   validation, `CommandError` and the `Authorizer` interface with `denyAll` and (for tests
   and system jobs) `allowAll`. Export `fieldErrorsFromZod` from `@cms/schema`.
   **Done when:** unit tests prove invalid input returns `invalid_input` with field errors
   and never calls the handler, a denying authorizer returns `forbidden` and never calls
   the handler, and `pnpm verify` passes.
-- [ ] 2. **Audit log table.** `audit_log` in the Drizzle schema, a generated migration and a
+- [x] 2. **Audit log table.** `audit_log` in the Drizzle schema, a generated migration and a
   custom migration adding row-level security (same policy as `entries`) and a trigger
   that rejects every `UPDATE` and `DELETE`.
   **Done when:** integration tests prove an audit row can be inserted inside
   `withSite`, `UPDATE` and `DELETE` on it fail, another site's rows are invisible, and
   `pnpm db:generate` reports no drift.
-- [ ] 3. **Transactional writes.** `runCommand` opens the transaction (site-scoped through
+- [x] 3. **Transactional writes.** `runCommand` opens the transaction (site-scoped through
   `withSite` when the command has a site), runs the handler on that transaction and
   inserts the audit row before commit. Add transaction-taking forms of `createSite`,
   `addDomain` and `createEntry` in `@cms/db` (the existing functions keep working).
   **Done when:** tests prove a command's change and its audit row commit together, and a
   failure after the change (forced in a test command) leaves neither.
-- [ ] 4. **The three commands.** `site.create`, `site.addDomain`, `entry.create` in
+- [x] 4. **The three commands.** `site.create`, `site.addDomain`, `entry.create` in
   `@cms/core`, each with a Zod input schema, a permission name and an audit record.
   **Done when:** tests prove each command writes exactly one audit row with the right
   actor type and id, action, target and diff; `DbError` codes reach the caller unchanged
   as `CommandError` codes; and cross-site attempts (an `entry.create` naming another
   site's parent) fail with no audit row written.
-- [ ] 5. **Docs.** Add `@cms/core` to `AGENTS.md` and state that new writes go through
+- [x] 5. **Docs.** Add `@cms/core` to `AGENTS.md` and state that new writes go through
   `runCommand`.
   **Done when:** `pnpm verify` passes and the layout reflects the new package.
 

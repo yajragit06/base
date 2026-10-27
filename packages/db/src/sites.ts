@@ -2,6 +2,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { DbError, UNIQUE_VIOLATION, violatedConstraint } from "./errors.js";
 import type { Db } from "./index.js";
 import { type Domain, domains, type Site, sites } from "./schema.js";
+import type { Executor } from "./site-scope.js";
 
 const LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
 const HOST = new RegExp(`^${LABEL}(?:\\.${LABEL})*(?::(\\d{1,5}))?$`);
@@ -19,7 +20,7 @@ const TIME_ZONE = /^(?:UTC|[A-Z][A-Za-z_-]*(?:\/[A-Za-z0-9_+-]+)+)$/;
 
 // The database, not the JS runtime, decides: Node's ICU resolves some current IANA names
 // (Asia/Kolkata) to old aliases (Asia/Calcutta) that newer tz data no longer ships.
-async function isTimeZone(db: Db, zone: string): Promise<boolean> {
+async function isTimeZone(db: Executor, zone: string): Promise<boolean> {
   if (!TIME_ZONE.test(zone)) return false;
   const { rows } = await db.execute(sql`SELECT 1 FROM pg_timezone_names WHERE name = ${zone}`);
   return rows.length > 0;
@@ -41,7 +42,7 @@ export interface NewSite {
   locales: string[];
 }
 
-export async function createSite(db: Db, input: NewSite): Promise<Site> {
+export async function createSite(db: Executor, input: NewSite): Promise<Site> {
   const name = input.name.trim();
   if (name === "") throw new DbError("invalid_name", "A site needs a name.");
   if (!(await isTimeZone(db, input.timeZone))) {
@@ -75,7 +76,7 @@ export async function createSite(db: Db, input: NewSite): Promise<Site> {
 }
 
 export async function addDomain(
-  db: Db,
+  db: Executor,
   siteId: string,
   input: { host: string; primary?: boolean },
 ): Promise<Domain> {
