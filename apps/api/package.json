@@ -6,16 +6,21 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/server.ts",
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "create-site": "tsx --env-file-if-exists=../../.env src/scripts/create-site.ts"
   },
   "dependencies": {
+    "@clerk/backend": "3.26.3",
+    "@cms/core": "workspace:*",
+    "@cms/db": "workspace:*",
     "fastify": "^5.12.7"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "drizzle-orm": "^0.45.4",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"

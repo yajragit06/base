@@ -11,7 +11,9 @@ export type DbErrorCode =
   | "invalid_type_key"
   | "parent_not_found"
   | "uri_taken"
-  | "uri_too_long";
+  | "uri_too_long"
+  | "user_not_found"
+  | "last_owner";
 
 /** An expected input or conflict error with a stable code; Feature 3 maps these to API errors. */
 export class DbError extends Error {
@@ -36,3 +38,4 @@ export function violatedConstraint(error: unknown, codes: string[]): string | un
 }
 
 export const UNIQUE_VIOLATION = "23505";
+export const FOREIGN_KEY_VIOLATION = "23503";

@@ -13,9 +13,22 @@ export {
 } from "./entries.js";
 export { DbError, type DbErrorCode } from "./errors.js";
 export { runMigrations, truncateAllTables } from "./migrations.js";
-export type { AuditEntry, Domain, Entry, Site } from "./schema.js";
-export { type Executor, type SiteTx, withSite } from "./site-scope.js";
+export type { AuditEntry, Domain, Entry, Membership, Site, User } from "./schema.js";
+export { ROLES, type Role } from "./schema.js";
+export { type Executor, type SiteTx, withSite, withUser } from "./site-scope.js";
 export { addDomain, createSite, findSiteByHost, listSites, type NewSite } from "./sites.js";
+export {
+  countOwnersInTx,
+  findOrCreateUser,
+  findUserByAuthId,
+  findUsersByEmail,
+  getMembership,
+  getMembershipInTx,
+  type Identity,
+  listMembershipsForUser,
+  setMembershipInTx,
+  type UserMembership,
+} from "./users.js";
 export { schema };
 
 export function createDb(connectionString: string) {

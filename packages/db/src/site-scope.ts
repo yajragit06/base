@@ -20,3 +20,15 @@ export function withSite<T>(db: Db, siteId: string, fn: (tx: SiteTx) => Promise<
     return fn(tx);
   });
 }
+
+/**
+ * Runs `fn` in a transaction scoped to one user: row-level security lets it read that user's
+ * own memberships across sites, and nothing else site-scoped.
+ */
+export function withUser<T>(db: Db, userId: string, fn: (tx: SiteTx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL ROLE cms_app`);
+    await tx.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
+    return fn(tx);
+  });
+}

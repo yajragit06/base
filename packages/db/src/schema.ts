@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -90,7 +91,43 @@ export const auditLog = pgTable(
   ],
 );
 
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  authId: text("auth_id").notNull().unique("users_auth_id_key"),
+  email: text("email").notNull(),
+  name: text("name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const ROLES = ["owner", "admin", "editor", "author", "viewer"] as const;
+export type Role = (typeof ROLES)[number];
+
+export const memberships = pgTable(
+  "memberships",
+  {
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "restrict" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    role: text("role").$type<Role>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "memberships_pkey", columns: [t.siteId, t.userId] }),
+    check(
+      "memberships_role_check",
+      sql`${t.role} IN ('owner', 'admin', 'editor', 'author', 'viewer')`,
+    ),
+    index("memberships_user_idx").on(t.userId),
+  ],
+);
+
 export type Site = typeof sites.$inferSelect;
 export type Domain = typeof domains.$inferSelect;
 export type Entry = typeof entries.$inferSelect;
 export type AuditEntry = typeof auditLog.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type Membership = typeof memberships.$inferSelect;
