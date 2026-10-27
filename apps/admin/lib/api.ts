@@ -39,6 +39,21 @@ export interface Me {
   memberships: { siteId: string; siteName: string; role: string }[];
 }
 
+/**
+ * The signed-in person and their sites, or `"email_not_verified"` when the identity
+ * provider has not verified their email yet. Other failures throw (see `app/error.tsx`).
+ */
+export async function getMe(): Promise<Me | "email_not_verified"> {
+  try {
+    return await apiGet<Me>("/me");
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "email_not_verified") {
+      return "email_not_verified";
+    }
+    throw error;
+  }
+}
+
 export interface TreeNode {
   id: string;
   parentId: string | null;

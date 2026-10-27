@@ -77,9 +77,14 @@ describe("GET /sites/:siteId/tree", () => {
   });
 
   it("returns 400 for a bad cursor, limit or unknown parameter", async () => {
-    expect((await get(`/sites/${siteA}/tree?after=zz`, "token-viewer")).json()).toEqual({
-      error: "invalid_cursor",
-    });
+    const outOfRange = Buffer.from(
+      JSON.stringify({ s: 2147483648, i: crypto.randomUUID() }),
+    ).toString("base64url");
+    for (const after of ["zz", outOfRange]) {
+      const res = await get(`/sites/${siteA}/tree?after=${after}`, "token-viewer");
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: "invalid_cursor" });
+    }
     for (const q of ["limit=0", "limit=201", "limit=abc", "extra=1"]) {
       const res = await get(`/sites/${siteA}/tree?${q}`, "token-viewer");
       expect(res.statusCode).toBe(400);

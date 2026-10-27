@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
-import { apiGet, type Me } from "@/lib/api";
+import { VerifyEmail } from "@/components/verify-email";
+import { getMe } from "@/lib/api";
 
 export default async function HomePage() {
-  const me = await apiGet<Me>("/me");
+  const me = await getMe();
+  if (me === "email_not_verified") return <VerifyEmail />;
   const first = me.memberships[0];
   if (first) redirect(`/sites/${first.siteId}`);
   return (

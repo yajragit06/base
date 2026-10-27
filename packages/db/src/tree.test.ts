@@ -1,6 +1,12 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { childrenPageQuery, createEntry, listChildrenPage, type TreeNode } from "./entries.js";
+import {
+  childrenPageQuery,
+  createEntry,
+  listChildrenPage,
+  parentsAmongQuery,
+  type TreeNode,
+} from "./entries.js";
 import { DbError } from "./errors.js";
 import type { Site } from "./schema.js";
 import { withSite } from "./site-scope.js";
@@ -124,7 +130,15 @@ describe("listChildrenPage", () => {
       "parent_not_found",
     );
     expect(await codeOf(listChildrenPage(db, siteA.id, "nope"))).toBe("parent_not_found");
-    for (const after of ["!!", "e30", Buffer.from('{"s":1,"i":"x"}').toString("base64url")]) {
+    const outOfRange = [2147483648, -2147483649, Number.MAX_SAFE_INTEGER, 1.5].map((s) =>
+      Buffer.from(JSON.stringify({ s, i: a.id })).toString("base64url"),
+    );
+    for (const after of [
+      "!!",
+      "e30",
+      Buffer.from('{"s":1,"i":"x"}').toString("base64url"),
+      ...outOfRange,
+    ]) {
       expect(await codeOf(listChildrenPage(db, siteA.id, null, { after }))).toBe("invalid_cursor");
     }
   });
@@ -136,21 +150,47 @@ describe("listChildrenPage", () => {
     expect((await listChildrenPage(db, siteA.id, null)).items).toHaveLength(100);
   });
 
-  it("reads one node's children through the parent index on a 5,000-node site", async () => {
-    const parents: string[] = [];
-    for (let p = 0; p < 50; p++) {
-      const parent = await createEntry(db, siteA.id, { slug: `p${p}`, typeKey: "page" });
-      parents.push(parent.id);
-      await bulkChildren(siteA.id, parent.id, 100, `p${p}-c`);
+  it("pages a 6,500-node site through indexes only, on cursor pages too", async () => {
+    const big = await createEntry(db, siteA.id, { slug: "big", typeKey: "page" });
+    await bulkChildren(siteA.id, big.id, 5000, "c");
+    await bulkChildren(siteA.id, null, 500, "t");
+    // Many small branches too, so the statistics look like a real site.
+    const { items: branches } = await listChildrenPage(db, siteA.id, null, { limit: 200 });
+    for (const [n, branch] of branches.slice(0, 100).entries()) {
+      await bulkChildren(siteA.id, branch.id, 10, `b${n}-`);
     }
     await db.execute(sql`ANALYZE entries`);
-    const parentId = parents[7] ?? null;
-    const plan = await withSite(db, siteA.id, async (tx) => {
-      const { rows } = await tx.execute(
-        sql`EXPLAIN (FORMAT JSON) ${childrenPageQuery(tx, siteA.id, parentId, undefined, 101)}`,
-      );
-      return JSON.stringify(rows);
+    const first = await listChildrenPage(db, siteA.id, big.id);
+    const topFirst = await listChildrenPage(db, siteA.id, null);
+    const cursorOf = (page: { items: TreeNode[] }) => {
+      const last = page.items.at(-1);
+      if (!last) throw new Error("empty page");
+      return { s: last.sortOrder, i: last.id };
+    };
+    const plans = await withSite(db, siteA.id, async (tx) => {
+      const explain = async (query: Parameters<typeof sql>[1]) => {
+        const { rows } = await tx.execute(sql`EXPLAIN (FORMAT JSON) ${query}`);
+        return JSON.stringify(rows);
+      };
+      return [
+        await explain(childrenPageQuery(tx, siteA.id, big.id, cursorOf(first), 101)),
+        await explain(childrenPageQuery(tx, siteA.id, null, cursorOf(topFirst), 101)),
+        await explain(
+          parentsAmongQuery(
+            tx,
+            siteA.id,
+            first.items.map((n) => n.id),
+          ),
+        ),
+        await explain(
+          parentsAmongQuery(
+            tx,
+            siteA.id,
+            topFirst.items.map((n) => n.id),
+          ),
+        ),
+      ];
     });
-    expect(plan).not.toContain('"Seq Scan"');
+    for (const plan of plans) expect(plan).not.toContain('"Seq Scan"');
   });
 });

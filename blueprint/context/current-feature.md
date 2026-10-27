@@ -86,6 +86,18 @@ be selected before `/complete`.
 - [x] 5. **Docs and final gate.** Document the route, the admin env vars and the
   site-scoped URL rule in `AGENTS.md`.
   **Done when:** `pnpm verify` passes and there is no migration drift.
+- [x] 6. **Repair review findings F-19, F-20, F-21 and F-22.** Reject cursors whose sort
+  value is outside the int4 range with `invalid_cursor`; compute `hasChildren` with a
+  second indexed query over the page's ids and compare `(sort_order, id)` as a row value;
+  render the tree flat from its visible rows (ARIA `aria-level`, no groups) with "Show
+  more" and "Retry" as tree items in the roving focus, loading rows hidden from assistive
+  tech, and a chevron that cannot take focus; show an explained state when `/me` answers
+  `email_not_verified`, and an `app/error.tsx` with retry for API outages.
+  **Done when:** db and API tests give 400 `invalid_cursor` for out-of-range cursors;
+  plan tests show no sequential scan for a cursor page under a 5,000-child parent and on
+  the top level; tree-state tests cover keyboard activation of "Show more" and "Retry"
+  and focus moving to the first new item; F-19 to F-22 are marked `fixed`; and
+  `pnpm verify` passes.
 
 ## Files / areas
 

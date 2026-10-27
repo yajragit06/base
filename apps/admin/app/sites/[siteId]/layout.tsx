@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 import { Mark } from "@/components/mark";
 import { SiteSwitcher } from "@/components/site-switcher";
 import { PageTree } from "@/components/tree/page-tree";
-import { ApiError, apiGet, type Me, type TreePage } from "@/lib/api";
+import { VerifyEmail } from "@/components/verify-email";
+import { ApiError, apiGet, getMe, type TreePage } from "@/lib/api";
 
 export default async function SiteLayout({
   children,
@@ -15,7 +16,8 @@ export default async function SiteLayout({
   params: Promise<{ siteId: string }>;
 }) {
   const { siteId } = await params;
-  const me = await apiGet<Me>("/me");
+  const me = await getMe();
+  if (me === "email_not_verified") return <VerifyEmail />;
   if (!me.memberships.some((m) => m.siteId === siteId)) notFound();
 
   let top: TreePage;
