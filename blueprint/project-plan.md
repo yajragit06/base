@@ -213,8 +213,9 @@ architecture doc before Feature 1.
 - **Validation:** Zod for fields, commands, API input and AI structured output.
 - **Queue / cache:** Redis + BullMQ for scheduled publish, async hooks, webhooks,
   embeddings, image variants and cache purges.
-- **Admin app:** Next.js (App Router) + React; component library **TODO** (shadcn/ui
-  suggested); rich text editor **TODO** (Tiptap or Lexical) storing structured JSON.
+- **Admin app:** Next.js (App Router) + React; shadcn/ui components with Tailwind CSS
+  (decided before Feature 6); rich text editor **TODO** (Tiptap or Lexical) storing
+  structured JSON.
 - **Site starter:** Next.js with cache tags and on-demand revalidation.
 - **Auth:** Clerk for people (behind an auth adapter so self-hosters can swap in
   Auth.js/Lucia); hashed scoped tokens for apps and agents.

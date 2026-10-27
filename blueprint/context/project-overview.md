@@ -1,6 +1,6 @@
 # Base - Project Overview
 
-<!-- blueprint:source-hash 7fd00656de9d5ffebcb43a66e344ef2ff4cdb6827d71a58a24eff8de719a1471 -->
+<!-- blueprint:source-hash f1fbf1fdd1fdc33087dc53806f578592e07c9a7ea5b7a36b4838f06abda9877b -->
 
 > The tree-first CMS for developers, editors and AI agents. An MIT-licensed, TypeScript,
 > API-first CMS framework with MODX's resource tree, a
@@ -194,7 +194,7 @@ and `audit_log` shapes; later features add columns, never reshape them.
 - **Drizzle + pg** - ORM; forward-only migrations compatible with the previous release.
 - **Zod** - fields, commands, API input, AI output.
 - **Redis + BullMQ** - scheduling, hooks, webhooks, embeddings, variants, purges.
-- **Next.js + React** - admin app and site starter; UI kit TODO (shadcn/ui suggested); rich text TODO (Tiptap or Lexical) stored as JSON.
+- **Next.js + React** - admin app and site starter; shadcn/ui with Tailwind CSS for the admin; rich text TODO (Tiptap or Lexical) stored as JSON.
 - **Clerk** (behind auth adapter) - people; hashed scoped tokens for apps and agents.
 - **Cloudflare R2** (S3 adapter, local disk in dev) - media; `sharp` for variants (assumed).
 - **Resend** - invites and alerts.
@@ -239,7 +239,7 @@ width up; WCAG 2.1 AA. Editor creates and publishes a page in ≤ 2 minutes.
 
 > TODO: multi-site is a free v1 P0 (D3) and also listed in the paid Team tier.
 > TODO: alt text required before publish; allow marking images decorative?
-> TODO: rich text editor and UI kit (needed by Features 6-7); billing provider (v1.1).
+> TODO: rich text editor (needed by Feature 7); billing provider (v1.1).
 > TODO: confirm assumptions: role matrix (before Feature 4), admin routes, `GET /healthz`,
 > `sharp` for image variants, env var names.
 > TODO: milestone weeks are reconstructed; the PRD's milestone diagram was missing.

@@ -25,9 +25,18 @@ order are in `blueprint/context/project-overview.md`; the full plan is
 - `apps/api` Fastify API. `src/app.ts` builds the app from injected `{ db, auth }`
   (`buildApp`, testable with `app.inject` and a fake `AuthAdapter`); `src/server.ts` wires
   Postgres and Clerk. `src/auth.ts` holds the `AuthAdapter` interface, the Clerk adapter and
-  `requireUser`, which turns `Authorization: Bearer <token>` into `request.user` or a 401.
-  Routes live in `src/routes/`.
-- `apps/admin` Next.js (App Router) admin app.
+  `requireUser`, which turns `Authorization: Bearer <token>` into `request.user` or a 401,
+  and `requireSiteMember`, which guards `/sites/:siteId/...` routes (404 for a malformed id,
+  403 for anyone without a role on the site, so site existence never leaks). Routes live in
+  `src/routes/`: `GET /me`, and `GET /sites/:siteId/tree?parentId=&after=&limit=` (one page
+  of children with `hasChildren`, any role; `listChildrenPage` in `@cms/db`).
+- `apps/admin` Next.js (App Router) admin app: Clerk sign-in (`proxy.ts` protects every page
+  but `/sign-in`), shadcn/ui components with Tailwind CSS 4 (`components/ui`, add only what
+  a screen uses), and the shell under `/sites/[siteId]` with the site switcher and the page
+  tree (`components/tree`; its state and keyboard logic is pure and unit-tested). Admin
+  URLs carry the site: `/sites/:siteId/...`. Server components and server actions call the
+  API through `lib/api.ts` with the Clerk session token; the admin never reads the
+  database, and the token never reaches client JavaScript.
 - `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`;
   sites and domains (`sites.ts`), the entry tree (`entries.ts`), immutable versions
   (`versions.ts`: one linear chain per entry and locale, the latest is the one nothing is
@@ -399,6 +408,9 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
   migration grants the `cms_app` role (needed by `withSite()` and `withUser()`) only to
   that user.
 - API env: `CLERK_SECRET_KEY` is required; the API refuses to start without it.
+- Admin env: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the same Clerk
+  instance, `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, and `API_URL` (default
+  `http://localhost:4000`). The admin builds without them; pages render per request.
 - Verify: `pnpm verify` (typecheck, lint, test, then build)
 - New site: `pnpm --filter @cms/api create-site -- --name <name> --time-zone <Area/City>
   --locale <tag> --owner-email <email>` (system only; the owner must have signed in once)

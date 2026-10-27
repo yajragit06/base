@@ -16,7 +16,8 @@
     "@clerk/backend": "3.26.3",
     "@cms/core": "workspace:*",
     "@cms/db": "workspace:*",
-    "fastify": "^5.12.7"
+    "fastify": "^5.12.7",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

@@ -16,7 +16,8 @@ export type DbErrorCode =
   | "last_owner"
   | "entry_not_found"
   | "version_not_found"
-  | "version_conflict";
+  | "version_conflict"
+  | "invalid_cursor";
 
 /** An expected input or conflict error with a stable code; Feature 3 maps these to API errors. */
 export class DbError extends Error {
