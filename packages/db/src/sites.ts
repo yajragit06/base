@@ -1,9 +1,10 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { DbError, UNIQUE_VIOLATION, violatedConstraint } from "./errors.js";
 import type { Db } from "./index.js";
 import { type Domain, domains, type Site, sites } from "./schema.js";
 
-const HOST = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?$/;
+const LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
+const HOST = new RegExp(`^${LABEL}(?:\\.${LABEL})*(?::(\\d{1,5}))?$`);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isUuid(value: string): boolean {
@@ -12,15 +13,16 @@ export function isUuid(value: string): boolean {
 
 const MAX_HOSTNAME = 253;
 
-// Intl also accepts UTC offsets and aliases such as "utc" or "EST"; Postgres reads offset
-// strings with the opposite sign, so only canonical zone names are stored.
-function isTimeZone(zone: string): boolean {
-  if (zone.startsWith("+") || zone.startsWith("-")) return false;
-  try {
-    return new Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions().timeZone === zone;
-  } catch {
-    return false;
-  }
+// Area/Location names or UTC only: this rules out offsets (which Postgres reads with the
+// opposite sign), abbreviations such as EST, and wrong case.
+const TIME_ZONE = /^(?:UTC|[A-Z][A-Za-z_-]*(?:\/[A-Za-z0-9_+-]+)+)$/;
+
+// The database, not the JS runtime, decides: Node's ICU resolves some current IANA names
+// (Asia/Kolkata) to old aliases (Asia/Calcutta) that newer tz data no longer ships.
+async function isTimeZone(db: Db, zone: string): Promise<boolean> {
+  if (!TIME_ZONE.test(zone)) return false;
+  const { rows } = await db.execute(sql`SELECT 1 FROM pg_timezone_names WHERE name = ${zone}`);
+  return rows.length > 0;
 }
 
 function canonicalLocale(locale: string): string | undefined {
@@ -42,7 +44,7 @@ export interface NewSite {
 export async function createSite(db: Db, input: NewSite): Promise<Site> {
   const name = input.name.trim();
   if (name === "") throw new DbError("invalid_name", "A site needs a name.");
-  if (!isTimeZone(input.timeZone)) {
+  if (!(await isTimeZone(db, input.timeZone))) {
     throw new DbError("invalid_time_zone", `"${input.timeZone}" is not an IANA time zone.`);
   }
   if (input.locales.length === 0) {
@@ -78,8 +80,14 @@ export async function addDomain(
   input: { host: string; primary?: boolean },
 ): Promise<Domain> {
   const host = input.host.toLowerCase();
+  const match = HOST.exec(host);
   const hostname = host.split(":")[0] ?? "";
-  if (!HOST.test(host) || hostname.length > MAX_HOSTNAME) {
+  const port = match?.[1] === undefined ? undefined : Number(match[1]);
+  if (
+    !match ||
+    hostname.length > MAX_HOSTNAME ||
+    (port !== undefined && (port < 1 || port > 65535))
+  ) {
     throw new DbError("invalid_host", `"${input.host}" is not a hostname with an optional port.`);
   }
   if (!isUuid(siteId)) throw new DbError("site_not_found", "Site not found.");

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { DbError } from "./errors.js";
 import { addDomain, createSite, findSiteByHost, listSites } from "./sites.js";
@@ -34,7 +35,15 @@ describe("createSite", () => {
     expect(await codeOf(createSite(db, { ...valid, timeZone: "Mars/Base" }))).toBe(
       "invalid_time_zone",
     );
-    for (const timeZone of ["+01:00", "-05:00", "utc", "europe/paris", "EST"]) {
+    for (const timeZone of [
+      "+01:00",
+      "-05:00",
+      "utc",
+      "europe/paris",
+      "EST",
+      "Mars/Olympus_Mons",
+      "posixrules",
+    ]) {
       expect(await codeOf(createSite(db, { ...valid, timeZone }))).toBe("invalid_time_zone");
     }
     expect(await codeOf(createSite(db, { ...valid, locales: [] }))).toBe("invalid_locale");
@@ -72,7 +81,14 @@ describe("domains", () => {
   });
 
   it("accepts canonical zone names", async () => {
-    for (const timeZone of ["UTC", "Europe/Paris", "Asia/Brunei"]) {
+    for (const timeZone of [
+      "UTC",
+      "Etc/UTC",
+      "Europe/Paris",
+      "Asia/Brunei",
+      "Asia/Kolkata",
+      "Europe/Kyiv",
+    ]) {
       expect(await codeOf(createSite(db, { ...valid, timeZone }))).toBe("ok");
     }
   });
@@ -95,6 +111,9 @@ describe("domains", () => {
       "-acme.com",
       "acme..com",
       "a b.com",
+      "acme.com:0",
+      "acme.com:65536",
+      `${"a".repeat(64)}.com`,
     ]) {
       expect(await codeOf(addDomain(db, site.id, { host }))).toBe("invalid_host");
     }
@@ -123,5 +142,15 @@ describe("domains", () => {
       await codeOf(addDomain(db, "00000000-0000-4000-8000-000000000000", { host: "x.com" })),
     ).toBe("site_not_found");
     expect(await codeOf(addDomain(db, "not-a-uuid", { host: "x.com" }))).toBe("site_not_found");
+  });
+});
+
+describe("database role", () => {
+  // The app must connect as the user that ran the migrations: only it is granted cms_app.
+  it("lets the migrating user switch to cms_app", async () => {
+    const { rows } = await db.execute<{ member: boolean }>(
+      sql`SELECT pg_has_role(current_user, 'cms_app', 'MEMBER') AS member`,
+    );
+    expect(rows[0]?.member).toBe(true);
   });
 });

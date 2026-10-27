@@ -375,6 +375,8 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
 - Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db` tests need
   `TEST_DATABASE_URL` exported (a disposable database: tests truncate every table) and
   a database user allowed to create roles.
+- Database user: the app must connect as the same user that runs `pnpm db:migrate`; the
+  migration grants the `cms_app` role (needed by `withSite()`) only to that user.
 - Verify: `pnpm verify` (typecheck, lint, test, then build)
 - Migrations: `pnpm db:generate` after editing `packages/db/src/schema.ts` (commit the
   generated migration), `pnpm db:migrate` to apply
