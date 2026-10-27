@@ -40,8 +40,10 @@ order are in `blueprint/context/project-overview.md`; the full plan is
   `Authorizer` check, then the change and its `audit_log` row in one transaction),
   `CommandError`, and the commands `site.create`, `site.addDomain`, `entry.create` (records
   the actor as creator) and `entry.saveDraft` (validates data against the entry's content
-  type, appends a draft, refuses a stale base with `version_conflict`; Authors may save
-  only on entries they created). Content types reach commands as
+  type, appends a draft; Authors may save only on entries they created). `entry.saveDraft`
+  fails with `forbidden`, `entry_not_found`, `invalid_locale`, `unknown_content_type`,
+  `invalid_input` (field errors under `data`), `version_not_found` or `version_conflict`
+  (the base is no longer the latest version). Content types reach commands as
   `CommandDeps.contentTypes`, available to handlers as `ctx.contentTypes`. Every
   new write is a command run through `runCommand`; the `@cms/db` write functions are its
   building blocks, not a second write path. `roleAuthorizer(db)` checks the user's role on

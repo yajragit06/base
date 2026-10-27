@@ -11,7 +11,7 @@ import {
 import { defineContentType, field } from "@cms/schema";
 import { asc, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Actor } from "../authorize.js";
+import type { Actor, Authorizer } from "../authorize.js";
 import { runCommand } from "../command.js";
 import { CommandError } from "../errors.js";
 import { roleAuthorizer } from "../permissions.js";
@@ -223,6 +223,37 @@ describe("entry.saveDraft", () => {
       { type: "user", id: crypto.randomUUID() } as Actor,
     ]) {
       expect(await codeOf(save(actor, { entryId: entry.id }))).toBe("forbidden");
+    }
+    expect(await versionCount()).toBe(0);
+    expect(await saveAudits()).toEqual([]);
+  });
+
+  it("refuses a user demoted or removed after the authorizer ran", async () => {
+    const editor = await member("editor");
+    const removed = await member("editor");
+    const entry = await entryBy(editor);
+    const allowed = roleAuthorizer(db);
+    // Changes the actor's membership after the authorizer has said yes.
+    const racing: Authorizer = async (actor, permission, scope) => {
+      const ok = await allowed(actor, permission, scope);
+      await withSite(db, siteA, async (tx) => {
+        if (actor.id === editor.id) await setMembershipInTx(tx, siteA, actor.id, "viewer");
+        else await tx.execute(sql`DELETE FROM memberships WHERE user_id = ${actor.id}`);
+      });
+      return ok;
+    };
+    for (const actor of [editor, removed]) {
+      expect(
+        await codeOf(
+          runCommand({ ...deps, authorize: racing }, saveDraftCommand, actor, {
+            siteId: siteA,
+            entryId: entry.id,
+            locale: "en",
+            baseVersionId: null,
+            data: { title: "Late" },
+          }),
+        ),
+      ).toBe("forbidden");
     }
     expect(await versionCount()).toBe(0);
     expect(await saveAudits()).toEqual([]);
