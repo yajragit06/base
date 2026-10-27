@@ -1,86 +1,71 @@
 # Coding Standards
 
-> Your conventions. Edit these once to match your stack. The defaults below
-> assume Next.js + TypeScript + Tailwind + Prisma; change or trim anything that
-> doesn't fit your project.
->
-> Run `/onboard` after installing the Blueprint. It tunes this file to the real
-> project stack, along with `AGENTS.md`, `CLAUDE.md` when present,
-> `ai-interaction.md`, `.gitignore`, and README placement. Review the result
-> before `/overview`.
+> Tuned by `/onboard` to this repository: a pnpm + Turborepo TypeScript monorepo with a
+> Fastify API, a Next.js admin app and Drizzle on PostgreSQL. Edit freely as conventions
+> settle; `TODO` marks choices the code has not made yet.
 
 ## TypeScript
 
-- Strict mode enabled
-- No `any` types - use proper typing or `unknown`
-- Define interfaces for all props, API responses, and data models
-- Use type inference where obvious, explicit types where helpful
+- Strict mode, plus `noUncheckedIndexedAccess` (see `tsconfig.base.json`)
+- ESM everywhere (`"type": "module"`); Node packages use `NodeNext` resolution, so
+  relative imports end in `.js`
+- No `any`; use proper types or `unknown`
+- Infer where obvious; export explicit types for public package APIs
 
-## React
+## Monorepo
 
-- Functional components only (no class components)
-- Use hooks for state and side effects
-- Keep components focused - one job per component
-- Extract reusable logic into custom hooks
+- Apps in `apps/*`, shared code in `packages/*`, scope `@cms/*` until the product is named
+- Workspace dependencies use `workspace:*`; packages build to `dist/` with `tsc` and
+  expose `main`/`types` from there
+- Add a new app or package only when a build-plan feature needs it, with `build`,
+  `typecheck` and (if it has logic) `test` scripts so Turborepo picks it up
+- The core never imports paid `ee-*` packages; they plug into extension points
 
-## Next.js
+## API (Fastify)
 
-- Server components by default
-- Only use `'use client'` when needed (interactivity, hooks, browser APIs)
-- Use Server Actions for form submissions and simple mutations
-- Use API routes when you need:
-  - Webhooks (Clerk, GitHub, etc.)
-  - File uploads with progress tracking
-  - Long-running operations
-  - Specific HTTP status codes or headers
-  - Endpoints for future mobile/CLI clients
-  - Third-party integrations
-- Otherwise, fetch data directly in server components
-- Dynamic routes for item/collection pages
+- `buildApp(deps)` in `apps/api/src/app.ts` builds the app from injected dependencies
+  without listening; `server.ts` wires real services and listens
+- Routes live in `apps/api/src/routes/`, one file per area, registered from `buildApp`
+- Every write goes through a typed command: Zod input, permission check, audit entry in
+  the same transaction (see the rules in `AGENTS.md`)
+- Validate every request body, query and param with Zod; return field-level errors
+  as `400` with a stable shape
+- Errors: throw typed HTTP errors; never leak stack traces or secrets in responses
 
-## File Organization
+## Database (Drizzle)
 
-- Components: `src/components/[feature]/ComponentName.tsx`
-- Pages: `src/app/[route]/page.tsx`
-- Server Actions: `src/actions/[feature].ts`
-- Types: `src/types/[feature].ts`
-- Lib/Utils: `src/lib/[utility].ts`
+- Schema in `packages/db/src/schema.ts`; generate migrations with `pnpm db:generate` and
+  commit them. Never edit an applied migration
+- Migrations are forward-only and must work with the previous release's code (add
+  columns first, drop them in a later release)
+- Every tenant table has `site_id`; every query filters by it, including updates and
+  deletes, and row-level security backs it up
+- Money-like or very large integers are never converted with `Number()`
+- Inserts that may repeat (jobs, webhooks) use `onConflictDoNothing` on a dedupe key
+
+## Admin app (Next.js)
+
+- App Router, server components by default; `'use client'` only for interactivity
+- Server components call the API (never the database directly for tenant data)
+- Styling and component kit: `TODO` (shadcn/ui suggested in the plan). No inline styles
+  once it is chosen
+- Rich text editor: `TODO` (Tiptap or Lexical), stored as structured JSON
+- Keyboard accessible and WCAG 2.1 AA; responsive down to tablet width
 
 ## Naming
 
-- Components: PascalCase (`ItemCard.tsx`)
-- Files: Match component name or kebab-case
-- Functions: camelCase
-- Constants: SCREAMING_SNAKE_CASE
-- Types/Interfaces: PascalCase (no prefix)
+- Components: PascalCase (`EntryEditor.tsx`)
+- Other files: kebab-case (`content-tree.ts`)
+- Functions and variables: camelCase; constants: SCREAMING_SNAKE_CASE
+- Types: PascalCase, no prefix
+- Database columns: snake_case; TypeScript fields: camelCase
 
-## Styling
+## Validation and errors
 
-- Tailwind CSS for all styling
-- Tailwind v4: CSS-first config (`@theme` in `globals.css`), no `tailwind.config.js`
-- Use shadcn/ui components where applicable
-- No inline styles
-- Dark mode first, light mode as option
-
-## Database
-
-- Use Prisma ORM for all database operations
-- Always use `prisma migrate dev` for schema changes (not `db push`)
-- Run `prisma migrate status` before committing to verify migrations are in sync
-- Production deployments must run `prisma migrate deploy` before the app starts
-
-## Data Fetching
-
-- Server components fetch directly with Prisma
-- Client components use Server Actions
-- Validate all inputs with Zod
-- Scope every user-owned query by the authenticated Clerk user id (`clerkUserId`); never trust a client-supplied user id
-
-## Error Handling
-
-- Use try/catch in Server Actions
-- Return `{ success, data, error }` pattern from actions
-- Display user-friendly error messages via toast
+- Zod at every trust boundary: HTTP input, command input, webhook bodies, AI output,
+  environment variables
+- Fail loudly in development (unknown blocks, invalid schemas); return safe messages in
+  production
 
 ## Testing
 
@@ -125,9 +110,11 @@ of the switch; the skills and `ai-interaction.md` only point back here.
 - Run them via the project's test command (see Commands in `AGENTS.md`), not a
   hardcoded tool name.
 
-Stack binding (swap for yours): a TypeScript app uses Vitest, `vi.mock()` for
-external dependencies (Prisma, Clerk, etc.), and `vi.useFakeTimers()` for
-time-dependent logic; a Python app would use pytest; a Go app `go test`.
+Stack binding: Vitest (`pnpm test`, which is on, so tests are a gate for logic-bearing
+steps). Database code is tested against real Postgres via `TEST_DATABASE_URL`, never a
+mocked database. External services (Clerk, Anthropic, Voyage, R2, Resend) are faked
+through their adapter interfaces. Use `vi.useFakeTimers()` for time-dependent logic and
+`app.inject` for API routes.
 
 ## Browser Verification
 

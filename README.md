@@ -42,8 +42,6 @@ pnpm format          # Biome format and safe lint fixes
 
 ## Next steps
 
-1. Settle the TODOs in `blueprint/project-plan.md` section 13; several change Features 1-5.
-2. Run `pnpm dlx create-ai-blueprint@latest` and pick your adapters. If it replaces
-   `blueprint/project-plan.md` or `blueprint/build-plan.md` with its stubs, restore them
-   with `git checkout -- blueprint/project-plan.md blueprint/build-plan.md`.
-3. Run `/onboard`, then `/overview` (regenerates the overview and fingerprint), then `/feature`.
+AI Blueprint is installed (Claude Code adapter) and onboarded. Settle the TODOs in
+`blueprint/project-plan.md` section 13, then run `/overview` (it refreshes the overview
+and offers the baseline commit) and `/feature` for Feature 1.
