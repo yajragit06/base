@@ -13,12 +13,12 @@ for optional tool settings.
 
 ## What this is
 
-An MIT-licensed, TypeScript, API-first CMS framework: MODX's resource tree, a
-schema-driven admin for editors, a typed Delivery API and SDK for sites and apps, and
-permissioned AI agents over MCP. Paid add-ons (AI pack, Team, Cloud) live in separate
-`@<name>/ee-*` packages. Product scope and build order are in
-`blueprint/context/project-overview.md`; the full plan is `blueprint/project-plan.md`.
-The product name is undecided: packages use the placeholder scope `@cms/*`.
+**Base**, the tree-first CMS for developers, editors and AI agents. An MIT-licensed,
+TypeScript, API-first CMS: MODX's resource tree, a schema-driven admin for editors, a typed
+Delivery API and SDK for sites and apps, and permissioned AI agents over MCP. Paid add-ons
+(AI pack, Team, Cloud) live in separate `@base/ee-*` packages. Product scope and build
+order are in `blueprint/context/project-overview.md`; the full plan is
+`blueprint/project-plan.md`. Code packages still use the `@cms/*` scope.
 
 ### Layout
 
@@ -70,7 +70,7 @@ The product name is undecided: packages use the placeholder scope `@cms/*`.
    dry-run count before apply.
 10. Jobs are idempotent with deterministic ids; webhooks are HMAC-signed and retried.
 11. Database migrations are forward-only and must work with the previous release's code.
-12. The core never imports `@<name>/ee-*` packages.
+12. The core never imports `@base/ee-*` packages.
 
 This project is built with the **AI Blueprint**, a workflow layer, not an
 app skeleton. To start a new project, scaffold the app first in an empty folder
