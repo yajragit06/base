@@ -83,6 +83,16 @@ and offers the pull request.
   and `europe/paris` rejected; over-long slug, host and deep URI return `DbError`
   codes; concurrency tests still pass; the RLS test fails on any other error), the
   ledger marks all five `fixed`, and `pnpm verify` passes.
+- [x] 7. **Repair second-review findings F-06 to F-09.** Validate time zones against the
+  database's `pg_timezone_names` with an `Area/Location` or `UTC` shape; limit host labels
+  to 63 characters and ports to 1-65535; align the spec's lock wording and drop the unused
+  `FOREIGN_KEY_VIOLATION`; document that the app connects as the same database user that
+  runs migrations (the one granted `cms_app`) and test that membership.
+  **Done when:** `Asia/Kolkata`, `Europe/Kyiv`, `Etc/UTC`, `UTC` and `Europe/Paris` are
+  accepted and `EST`, `utc`, `+01:00` and a name the database does not list rejected
+  (whether an old alias such as `Asia/Calcutta` is listed depends on the server's tz data); `:0`, `:65536` and a
+  64-character label return `invalid_host`; a test proves the migrating user is a member
+  of `cms_app`; F-06 to F-09 are marked `fixed`; and `pnpm verify` passes.
 
 ## Files / areas
 
@@ -108,7 +118,7 @@ Times are `timestamptz`. Columns are snake_case; TypeScript fields camelCase.
 | --- | --- | --- |
 | `id` | uuid | primary key |
 | `name` | text | non-empty, trimmed |
-| `time_zone` | text | a canonical IANA zone name: `Intl` must resolve it to exactly the input, and offset forms such as `+01:00` are rejected |
+| `time_zone` | text | an IANA `Area/Location` name or `UTC`, exact case, that this database knows (listed in `pg_timezone_names`); offsets, aliases such as `EST` and lowercase forms are rejected |
 | `default_locale` | text | must be one of `locales` |
 | `locales` | text[] | at least one; each a canonical BCP 47 tag (`Intl.getCanonicalLocales`); no duplicates |
 | `created_at` | timestamptz | default now() |
@@ -119,7 +129,7 @@ Times are `timestamptz`. Columns are snake_case; TypeScript fields camelCase.
 | --- | --- | --- |
 | `id` | uuid | primary key |
 | `site_id` | uuid | references `sites`, on delete restrict |
-| `host` | text | stored lowercase; hostname of at most 253 characters with optional `:port`, no scheme or path; unique across the install |
+| `host` | text | stored lowercase; hostname of at most 253 characters with labels of at most 63, optional `:port` from 1 to 65535, no scheme or path; unique across the install |
 | `is_primary` | boolean | default false; at most one primary per site (partial unique index) |
 
 **`entries`** (row-level secured)
@@ -146,6 +156,8 @@ for future tables), and on `entries` enables and forces RLS with one policy:
 `SET LOCAL ROLE cms_app` and `set_config('app.site_id', siteId, true)`, then calls `fn`.
 Superusers ignore RLS, so switching to `cms_app` is what makes the policy apply,
 locally, in CI and in production. With no site set, no entry rows are visible.
+The migration grants `cms_app` only to the user that runs it, so the app must connect
+as that same database user; a separate runtime user is revisited in Feature 31.
 
 **Functions** (all entry functions take `siteId` and run inside `withSite`; their queries
 also filter by `site_id` explicitly):
@@ -156,7 +168,7 @@ also filter by `site_id` explicitly):
 - `findSiteByHost(db, host)` returns the site or `null`; matching ignores case.
 - `createEntry(db, siteId, { parentId?, slug, typeKey })` returns the entry, appended
   after its siblings. It locks the parent row (or, for top-level entries, the site row)
-  `FOR UPDATE` while it reads the next sort order, so concurrent creates never collide.
+  `FOR NO KEY UPDATE` while it reads the next sort order, so concurrent creates never collide.
 - `getEntry(db, siteId, id)`, `getEntryByUri(db, siteId, uri)` return the entry or `null`.
 - `listChildren(db, siteId, parentId | null)` returns children ordered by `sort_order`,
   then `id`.

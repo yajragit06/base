@@ -47,34 +47,34 @@
 **Suggested fix:** Follow the `@cms/schema` pattern: no exclude in `tsconfig.json` (with `noEmit`), a `tsconfig.build.json` with the exclude and `outDir`, and `build` pointed at it.
 **Resolution:** Fixed: `tsconfig.json` typechecks all of `src` (tests included) with `noEmit`; `tsconfig.build.json` excludes tests and emits `dist`. Closed 2026-10-27 by independent re-review: packages/db/tsconfig.json includes all of `src` with `noEmit`, tsconfig.build.json excludes tests, package.json `build` uses it, `pnpm typecheck` passes and `dist/` contains no test files.
 
-### F-06 [P1] open - Time zone check rejects canonical IANA names and accepts legacy aliases Postgres does not know
+### F-06 [P1] fixed - Time zone check rejects canonical IANA names and accepts legacy aliases Postgres does not know
 
 **File:** packages/db/src/sites.ts:20
 **Found:** 2026-10-27 by /audit independent (scope: current; lens: quality, tests)
 **Why it matters:** The F-01 repair requires `Intl.DateTimeFormat(...).resolvedOptions().timeZone === zone`, but ICU (Node v22.22.0, ICU 77.1) resolves many current IANA canonical names to their deprecated backward-link aliases. A probe showed `Asia/Kolkata`, `Europe/Kyiv`, `Asia/Ho_Chi_Minh`, `Asia/Kathmandu`, `Asia/Yangon`, `America/Argentina/Buenos_Aires`, `America/Nuuk`, `Pacific/Kanton` and `Etc/UTC` are all rejected with `invalid_time_zone`, while `Asia/Calcutta` and `Europe/Kiev` are accepted and stored. The project's Postgres 16.15 lists `Asia/Kolkata` and `Europe/Kyiv` in `pg_timezone_names`, and `AT TIME ZONE 'Asia/Calcutta'` / `'Europe/Kiev'` fail with "time zone not recognized". So sites in India, Ukraine, Vietnam and other countries cannot use their canonical zone, the values that are accepted break later Postgres date handling, and which names pass depends on the Node/ICU version (newer ECMA-402 engines resolve to the primary IANA name), so revalidating stored data can flip after a runtime upgrade. This contradicts the spec's "a canonical IANA zone name" contract for stored data. The "accepts canonical zone names" test (sites.test.ts:292-296) only covers names where ICU and IANA agree.
 **Suggested fix:** Validate against the zone names the database will consume, not ICU's canonical form: keep the offset/sign rejection, require the `Area/Location` (or `UTC`) shape with exact case, and check membership in Postgres `pg_timezone_names` (or a vendored IANA zone list) so `Asia/Kolkata` and `Europe/Kyiv` pass and `Asia/Calcutta`, `EST`, `utc` and `+01:00` fail. Add `Asia/Kolkata`, `Europe/Kyiv` and `Etc/UTC` to the accept test and `Asia/Calcutta` to the reject cases.
-**Resolution:**
+**Resolution:** Fixed: `isTimeZone` now requires an `Area/Location` or `UTC` shape in exact case and checks the name against the database's own `pg_timezone_names`, so the value is always one this Postgres understands; Node's ICU is no longer consulted. `Asia/Kolkata`, `Europe/Kyiv`, `Etc/UTC`, `UTC`, `Europe/Paris` and `Asia/Brunei` are accepted; `EST`, `utc`, `+01:00`, `posixrules` and an unknown `Mars/Olympus_Mons` are rejected (sites.test.ts). Whether an old alias such as `Asia/Calcutta` passes depends on the server's tz data (it does not on Postgres 16.15 here), so the test does not assert it.
 
-### F-07 [P3] open - Host check accepts invalid ports and over-long DNS labels
+### F-07 [P3] fixed - Host check accepts invalid ports and over-long DNS labels
 
 **File:** packages/db/src/sites.ts:6
 **Found:** 2026-10-27 by /audit independent (scope: current; lens: security, quality)
 **Why it matters:** `HOST` allows `:\d{1,5}`, so `acme.com:0` and `acme.com:99999` are stored, and labels are not limited to 63 characters, so names no resolver can serve pass as valid hosts. They can never match a real request host, and Feature 3 will expose this to user input.
 **Suggested fix:** Limit each label to 63 characters in the regex (`[a-z0-9-]{0,61}`) and check the parsed port is 1-65535; add `:0`, `:65536` and a 64-character label to the malformed-host test.
-**Resolution:**
+**Resolution:** Fixed: host labels are limited to 63 characters in the regex and the port must be 1-65535; `acme.com:0`, `acme.com:65536` and a 64-character label return `invalid_host` (sites.test.ts).
 
-### F-08 [P3] open - Small drift: spec still says FOR UPDATE; unused FOREIGN_KEY_VIOLATION export
+### F-08 [P3] fixed - Small drift: spec still says FOR UPDATE; unused FOREIGN_KEY_VIOLATION export
 
 **File:** packages/db/src/errors.ts:39
 **Found:** 2026-10-27 by /audit independent (scope: current; lens: quality)
 **Why it matters:** The spec's Functions section (current-feature.md:158-159) still says `createEntry` locks the parent or site row `FOR UPDATE`, while the code and Step 6 use `FOR NO KEY UPDATE`, so the spec that gets archived describes a different lock. `FOREIGN_KEY_VIOLATION` is exported but referenced nowhere.
 **Suggested fix:** Update the spec sentence to `FOR NO KEY UPDATE` and either delete the constant or use it when Feature 3 maps a foreign-key error. Nothing current depends on the constant.
-**Resolution:**
+**Resolution:** Fixed: the spec's Functions section now says `FOR NO KEY UPDATE`, and the unused `FOREIGN_KEY_VIOLATION` export is removed.
 
-### F-09 [P2] unverified - Only the user that runs migrations can switch to cms_app
+### F-09 [P2] fixed - Only the user that runs migrations can switch to cms_app
 
 **File:** packages/db/drizzle/0001_entries_row_level_security.sql:10
 **Found:** 2026-10-27 by /audit independent (scope: current; lens: security)
 **Why it matters:** The migration runs `GRANT cms_app TO CURRENT_USER`, the migrating user. If production connects as a separate, less-privileged runtime user (a common setup), that user is not a member of `cms_app`, so every `withSite` would fail on `SET LOCAL ROLE cms_app`. If `cms_app` already exists in the cluster and the migrating user lacks ADMIN on it, the GRANT itself could fail. Not reproduced: tests and dev use one user. AGENTS.md documents only that the database user must be able to create roles.
 **Suggested fix:** Document that the app and migration users must be the same, or add a deployment step (or env-driven grant) that grants `cms_app` to the runtime user, and fail fast at startup when `pg_has_role(current_user, 'cms_app', 'MEMBER')` is false.
-**Resolution:**
+**Resolution:** Fixed by decision: the app connects as the same database user that runs migrations, documented in AGENTS.md (Commands) and the spec; a test asserts `pg_has_role(current_user, 'cms_app', 'MEMBER')` after migrating. A separate runtime user is revisited in Feature 31.
