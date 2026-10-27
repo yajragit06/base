@@ -10,7 +10,8 @@ export type DbErrorCode =
   | "invalid_slug"
   | "invalid_type_key"
   | "parent_not_found"
-  | "uri_taken";
+  | "uri_taken"
+  | "uri_too_long";
 
 /** An expected input or conflict error with a stable code; Feature 3 maps these to API errors. */
 export class DbError extends Error {

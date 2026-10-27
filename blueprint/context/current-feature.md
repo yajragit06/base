@@ -75,6 +75,14 @@ and offers the pull request.
   get distinct sort orders; add the new functions and test setup to `AGENTS.md`.
   **Done when:** a test running 10 parallel creates under one parent gets sort orders
   0-9 with no duplicates, and `pnpm verify` passes.
+- [x] 6. **Repair independent-review findings F-01 to F-05.** Canonical time zones only;
+  length limits on slug, host, URI and path; `FOR NO KEY UPDATE` sibling locks; the RLS
+  insert test asserts the policy error (42501); `@cms/db` typecheck includes its tests
+  via a separate `tsconfig.build.json`.
+  **Done when:** each finding has a test or check proving the repair (`+01:00`, `utc`
+  and `europe/paris` rejected; over-long slug, host and deep URI return `DbError`
+  codes; concurrency tests still pass; the RLS test fails on any other error), the
+  ledger marks all five `fixed`, and `pnpm verify` passes.
 
 ## Files / areas
 
@@ -100,7 +108,7 @@ Times are `timestamptz`. Columns are snake_case; TypeScript fields camelCase.
 | --- | --- | --- |
 | `id` | uuid | primary key |
 | `name` | text | non-empty, trimmed |
-| `time_zone` | text | a valid IANA zone (checked with `Intl`) |
+| `time_zone` | text | a canonical IANA zone name: `Intl` must resolve it to exactly the input, and offset forms such as `+01:00` are rejected |
 | `default_locale` | text | must be one of `locales` |
 | `locales` | text[] | at least one; each a canonical BCP 47 tag (`Intl.getCanonicalLocales`); no duplicates |
 | `created_at` | timestamptz | default now() |
@@ -111,7 +119,7 @@ Times are `timestamptz`. Columns are snake_case; TypeScript fields camelCase.
 | --- | --- | --- |
 | `id` | uuid | primary key |
 | `site_id` | uuid | references `sites`, on delete restrict |
-| `host` | text | stored lowercase; hostname with optional `:port`, no scheme or path; unique across the install |
+| `host` | text | stored lowercase; hostname of at most 253 characters with optional `:port`, no scheme or path; unique across the install |
 | `is_primary` | boolean | default false; at most one primary per site (partial unique index) |
 
 **`entries`** (row-level secured)
@@ -122,8 +130,8 @@ Times are `timestamptz`. Columns are snake_case; TypeScript fields camelCase.
 | `site_id` | uuid | references `sites` |
 | `parent_id` | uuid, nullable | `(site_id, parent_id)` references `entries (site_id, id)`, so a parent is always in the same site; on delete restrict |
 | `sort_order` | integer | position among siblings, starting at 0 |
-| `slug` | text | `^[a-z0-9]+(?:-[a-z0-9]+)*$` (same rule as `field.slug()`) |
-| `uri` | text | `/` + ancestor slugs and own slug joined by `/`, e.g. `/about/team`; unique per site |
+| `slug` | text | `^[a-z0-9]+(?:-[a-z0-9]+)*$` (same rule as `field.slug()`), at most 200 characters |
+| `uri` | text | `/` + ancestor slugs and own slug joined by `/`, e.g. `/about/team`; unique per site; `uri` and `path` each at most 2048 characters |
 | `path` | text | materialized path of ids, `/<rootId>/.../<ownId>/`; indexed for prefix search |
 | `type_key` | text | content type key, `^[a-z][a-zA-Z0-9]*$` |
 | `created_at` | timestamptz | default now() |
@@ -156,7 +164,8 @@ also filter by `site_id` explicitly):
 **Errors.** Invalid input and conflicts throw `DbError` with a stable `code`:
 `invalid_name`, `invalid_time_zone`, `invalid_locale`, `invalid_default_locale`,
 `invalid_host`, `host_taken`, `primary_domain_exists`, `site_not_found`,
-`invalid_slug`, `invalid_type_key`, `parent_not_found`, `uri_taken`. Unexpected database
+`invalid_slug`, `invalid_type_key`, `parent_not_found`, `uri_taken`, `uri_too_long`
+(the entry's URI or path would exceed 2048 characters). Unexpected database
 errors are rethrown unchanged. Feature 3's commands turn these into API errors.
 
 ## Testing

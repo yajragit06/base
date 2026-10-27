@@ -10,10 +10,14 @@ export function isUuid(value: string): boolean {
   return UUID.test(value);
 }
 
+const MAX_HOSTNAME = 253;
+
+// Intl also accepts UTC offsets and aliases such as "utc" or "EST"; Postgres reads offset
+// strings with the opposite sign, so only canonical zone names are stored.
 function isTimeZone(zone: string): boolean {
+  if (zone.startsWith("+") || zone.startsWith("-")) return false;
   try {
-    new Intl.DateTimeFormat("en", { timeZone: zone });
-    return true;
+    return new Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions().timeZone === zone;
   } catch {
     return false;
   }
@@ -74,7 +78,8 @@ export async function addDomain(
   input: { host: string; primary?: boolean },
 ): Promise<Domain> {
   const host = input.host.toLowerCase();
-  if (!HOST.test(host)) {
+  const hostname = host.split(":")[0] ?? "";
+  if (!HOST.test(host) || hostname.length > MAX_HOSTNAME) {
     throw new DbError("invalid_host", `"${input.host}" is not a hostname with an optional port.`);
   }
   if (!isUuid(siteId)) throw new DbError("site_not_found", "Site not found.");

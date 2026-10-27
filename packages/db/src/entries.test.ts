@@ -72,6 +72,28 @@ describe("createEntry", () => {
     expect(await codeOf(createEntry(db, siteB.id, { slug: "a", typeKey: "page" }))).toBe("ok");
   });
 
+  it("limits slug length and URI depth", async () => {
+    expect(
+      await codeOf(createEntry(db, siteA.id, { slug: "a".repeat(200), typeKey: "page" })),
+    ).toBe("ok");
+    expect(
+      await codeOf(createEntry(db, siteA.id, { slug: "b".repeat(201), typeKey: "page" })),
+    ).toBe("invalid_slug");
+    // Ten levels of 200-character slugs fit in 2048 characters; the eleventh does not.
+    let parentId: string | null = null;
+    for (let level = 0; level < 10; level++) {
+      const entry = await createEntry(db, siteA.id, {
+        parentId,
+        slug: "c".repeat(200),
+        typeKey: "page",
+      });
+      parentId = entry.id;
+    }
+    expect(
+      await codeOf(createEntry(db, siteA.id, { parentId, slug: "c".repeat(200), typeKey: "page" })),
+    ).toBe("uri_too_long");
+  });
+
   it("rejects invalid slugs and type keys", async () => {
     for (const slug of ["About", "about us", "-about", "", "a--b"]) {
       expect(await codeOf(createEntry(db, siteA.id, { slug, typeKey: "page" }))).toBe(
@@ -176,7 +198,7 @@ describe("row-level security", () => {
               VALUES (${siteB.id}, 0, 'x', '/x', '/x/', 'page')`,
         ),
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ cause: { code: "42501" } });
     const b = await createEntry(db, siteB.id, { slug: "b", typeKey: "page" });
     const updated = await withSite(db, siteA.id, (tx) =>
       tx.execute(sql`UPDATE entries SET slug = 'hacked' WHERE id = ${b.id}`),

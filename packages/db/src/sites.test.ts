@@ -34,6 +34,9 @@ describe("createSite", () => {
     expect(await codeOf(createSite(db, { ...valid, timeZone: "Mars/Base" }))).toBe(
       "invalid_time_zone",
     );
+    for (const timeZone of ["+01:00", "-05:00", "utc", "europe/paris", "EST"]) {
+      expect(await codeOf(createSite(db, { ...valid, timeZone }))).toBe("invalid_time_zone");
+    }
     expect(await codeOf(createSite(db, { ...valid, locales: [] }))).toBe("invalid_locale");
     expect(await codeOf(createSite(db, { ...valid, locales: ["en", "not a tag"] }))).toBe(
       "invalid_locale",
@@ -66,6 +69,21 @@ describe("domains", () => {
     expect((await findSiteByHost(db, "www.ACME.com"))?.id).toBe(site.id);
     expect((await findSiteByHost(db, "localhost:3000"))?.id).toBe(site.id);
     expect(await findSiteByHost(db, "other.com")).toBeNull();
+  });
+
+  it("accepts canonical zone names", async () => {
+    for (const timeZone of ["UTC", "Europe/Paris", "Asia/Brunei"]) {
+      expect(await codeOf(createSite(db, { ...valid, timeZone }))).toBe("ok");
+    }
+  });
+
+  it("rejects hostnames longer than 253 characters", async () => {
+    const site = await createSite(db, valid);
+    const label = "a".repeat(63);
+    const longest = [label, label, label, "a".repeat(61)].join(".");
+    expect(longest).toHaveLength(253);
+    expect(await codeOf(addDomain(db, site.id, { host: `${longest}:8080` }))).toBe("ok");
+    expect(await codeOf(addDomain(db, site.id, { host: `${longest}a` }))).toBe("invalid_host");
   });
 
   it("rejects malformed hosts", async () => {
