@@ -3,6 +3,7 @@
 **From build-plan:** feature 4
 **Build attempt:** 1
 **Branch:** feature/sign-in-and-roles
+**Status:** verified
 
 ## Goal
 
@@ -51,27 +52,27 @@ review will be selected before `/complete`.
 
 ## Build steps
 
-- [ ] 1. **Users and memberships.** Tables, generated migration, and a custom migration
+- [x] 1. **Users and memberships.** Tables, generated migration, and a custom migration
   for row-level security on `memberships`. Data-access functions: `findOrCreateUser`,
   `findUsersByEmail`, `getMembership`, `listMembershipsForUser`, and a transaction-taking
   `setMembershipInTx`.
   **Done when:** integration tests prove users are created once per auth id (concurrent
   first requests create one row), memberships are unique per user and site, another
   site's memberships are invisible inside `withSite`, and there is no migration drift.
-- [ ] 2. **Role authorizer.** `PERMISSIONS` maps each permission to the roles that hold
+- [x] 2. **Role authorizer.** `PERMISSIONS` maps each permission to the roles that hold
   it; `roleAuthorizer(db)` allows system actors, denies agents, and allows a user only
   when their role on the command's site holds the permission. Unknown permissions and
   install-level permissions are denied for users.
   **Done when:** a table-driven test covers every role against every permission in the
   table, plus a non-member, a member of another site (cross-site), an agent, a system
   actor and an unknown permission.
-- [ ] 3. **`membership.grant` command.** Owners and Admins grant or change roles; only an
+- [x] 3. **`membership.grant` command.** Owners and Admins grant or change roles; only an
   Owner may grant the Owner role or change an Owner's role; a site always keeps at least
   one Owner.
   **Done when:** tests prove each rule (including `last_owner` and an Admin trying to make
   or demote an Owner), the change and its audit row commit together, and a cross-site
   grant is refused with no audit row.
-- [ ] 4. **Sign-in in the API.** `AuthAdapter`, the Clerk adapter, the Fastify auth hook
+- [x] 4. **Sign-in in the API.** `AuthAdapter`, the Clerk adapter, the Fastify auth hook
   and `GET /me`. `buildApp` takes its database and auth adapter as dependencies;
   `server.ts` builds the Clerk adapter from `CLERK_SECRET_KEY` and refuses to start
   without it.
@@ -80,7 +81,7 @@ review will be selected before `/complete`.
   and returns only that user's memberships (cross-site test with two users and two
   sites), and `/healthz` stays public. A unit test proves the Clerk adapter maps a
   verified token and profile to our identity using a stubbed Clerk client.
-- [ ] 5. **Bootstrap script and docs.** `pnpm --filter @cms/api create-site` runs
+- [x] 5. **Bootstrap script and docs.** `pnpm --filter @cms/api create-site` runs
   `site.create` and `membership.grant` (Owner) as a system actor for a user who has signed
   in once; document it, the new env vars and `@cms/core`'s authorizer in `AGENTS.md`.
   **Done when:** an integration test runs the script's function end to end (site
@@ -154,12 +155,16 @@ New error codes: `user_not_found`, `last_owner` (added to `DbErrorCode` so the m
 **Auth adapter**
 
 ```ts
-interface AuthIdentity { authId: string; email: string; name: string | null }
 interface AuthAdapter {
-  /** The identity for a session token, or null if it is not valid. Never throws for bad tokens. */
-  verify(token: string): Promise<AuthIdentity | null>;
+  /** The provider's subject id for a valid session token, else null. Never throws for bad tokens. */
+  verify(token: string): Promise<string | null>;
+  /** The person's email and name; only called the first time we see them. */
+  getProfile(authId: string): Promise<{ email: string; name: string | null }>;
 }
 ```
+
+(Split from a single `verify` returning the whole identity during implementation, so the
+Clerk API is called only for a user's first request, not on every request.)
 
 The Clerk adapter verifies the session token with `@clerk/backend` (`CLERK_SECRET_KEY`)
 and reads the user's primary email and name from Clerk only when needed. The API reads

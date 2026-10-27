@@ -22,8 +22,11 @@ The product name is undecided: packages use the placeholder scope `@cms/*`.
 
 ### Layout
 
-- `apps/api` Fastify API. `src/app.ts` builds the app (`buildApp`, testable with
-  `app.inject`); `src/server.ts` listens.
+- `apps/api` Fastify API. `src/app.ts` builds the app from injected `{ db, auth }`
+  (`buildApp`, testable with `app.inject` and a fake `AuthAdapter`); `src/server.ts` wires
+  Postgres and Clerk. `src/auth.ts` holds the `AuthAdapter` interface, the Clerk adapter and
+  `requireUser`, which turns `Authorization: Bearer <token>` into `request.user` or a 401.
+  Routes live in `src/routes/`.
 - `apps/admin` Next.js (App Router) admin app.
 - `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`;
   sites and domains (`sites.ts`), the entry tree (`entries.ts`), `DbError` codes, and
@@ -35,8 +38,11 @@ The product name is undecided: packages use the placeholder scope `@cms/*`.
   `Authorizer` check, then the change and its `audit_log` row in one transaction),
   `CommandError`, and the commands `site.create`, `site.addDomain`, `entry.create`. Every
   new write is a command run through `runCommand`; the `@cms/db` write functions are its
-  building blocks, not a second write path. The default authorizer is `denyAll` until
-  roles exist (Feature 4).
+  building blocks, not a second write path. `roleAuthorizer(db)` checks the user's role on
+  the command's site against `PERMISSIONS` (`src/permissions.ts`): system actors are
+  allowed, agents denied until API tokens exist, and a permission missing from the table
+  is denied. Add a row there for every new command. `membership.grant` assigns roles; only
+  an Owner grants or changes the Owner role, and a site always keeps one Owner.
 - Further apps and packages (worker, SDK, CLI, MCP, site starter) are
   added by the build-plan feature that first needs them.
 
@@ -382,8 +388,12 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
   `TEST_DATABASE_URL` exported (a disposable database: tests truncate every table) and
   a database user allowed to create roles.
 - Database user: the app must connect as the same user that runs `pnpm db:migrate`; the
-  migration grants the `cms_app` role (needed by `withSite()`) only to that user.
+  migration grants the `cms_app` role (needed by `withSite()` and `withUser()`) only to
+  that user.
+- API env: `CLERK_SECRET_KEY` is required; the API refuses to start without it.
 - Verify: `pnpm verify` (typecheck, lint, test, then build)
+- New site: `pnpm --filter @cms/api create-site -- --name <name> --time-zone <Area/City>
+  --locale <tag> --owner-email <email>` (system only; the owner must have signed in once)
 - Migrations: `pnpm db:generate` after editing `packages/db/src/schema.ts` (commit the
   generated migration), `pnpm db:migrate` to apply
 
