@@ -1,22 +1,40 @@
-# MODX-style CMS Framework
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.svg">
+    <img src="assets/logo-light.svg" alt="Base" width="220" height="64">
+  </picture>
+</p>
 
-An MIT-licensed, TypeScript, API-first CMS framework with MODX's resource tree, a
-schema-driven admin for editors, and permissioned AI agents over MCP. The product name is
-not decided yet; `<name>` stands for it in the plans.
+<p align="center"><strong>The tree-first CMS for developers, editors and AI agents.</strong></p>
 
-The monorepo is scaffolded; no features are built yet. The planning files use the
-[AI Blueprint](https://github.com/aiblueprinthq/ai-blueprint) `blueprint/` structure,
-converted from the "Modern MODX-style CMS Framework PRD (Open-core edition)".
+Base is an open-source, TypeScript, API-first content management system. Every site is a
+tree of pages, as in MODX: where a page sits in the tree is its URL. Developers define
+content types in code and own every line of markup. Editors get a clean admin generated
+from those types, with drafts, previews and version history. Apps read the same content
+through a typed API. AI agents can search, draft and edit over MCP, and a person with the
+right role always approves what goes live.
+
+The core is free and MIT-licensed. Paid add-ons (AI, team governance and managed hosting)
+live in separate packages, and the core never depends on them.
+
+> **Status:** early development. Built so far: content type definitions, sites and the
+> page tree, the audited write path, and sign-in with per-site roles. The admin app and
+> the public APIs come next; see the [build plan](blueprint/build-plan.md).
 
 ## Layout
 
-- `apps/api` Fastify API. `src/app.ts` builds the app (`buildApp`), `src/server.ts` listens.
+- `apps/api` Fastify API: sign-in through an auth adapter (Clerk today), `GET /me`, and a
+  `create-site` script for new sites.
 - `apps/admin` Next.js admin app.
-- `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`.
+- `packages/schema` `defineContentType()`, the field builders and `validateEntry()`.
+- `packages/db` Drizzle schema and migrations: sites, domains, the entry tree, users,
+  memberships and the append-only audit log, isolated per site with row-level security.
+- `packages/core` the single write path: typed commands with role checks and an audit row
+  in the same transaction.
 
 More apps and packages (worker, SDK, CLI, MCP server, site starter) arrive with the
-build-plan features that need them. Packages use the placeholder scope `@cms/*` until
-the product is named.
+build-plan features that need them. Code packages still use the `@cms/*` scope.
 
 ## Commands
 
@@ -31,17 +49,17 @@ pnpm db:generate     # after editing packages/db/src/schema.ts; commit the migra
 pnpm format          # Biome format and safe lint fixes
 ```
 
+Database tests need `TEST_DATABASE_URL` exported (a disposable database), and the API
+needs `CLERK_SECRET_KEY`. `AGENTS.md` has the full command list and the project rules.
+
 ## Planning files
+
+Base is built with the [AI Blueprint](https://github.com/aiblueprinthq/ai-blueprint)
+workflow, one reviewed feature at a time.
 
 | File | What it holds |
 | --- | --- |
 | `blueprint/project-plan.md` | The full plan: problem, users and roles, features with PRD IDs, data, stack, pricing, UI, deployment, NFRs, core rules, metrics, milestones and gates, risks, open questions |
 | `blueprint/build-plan.md` | 54 numbered features in build order across M0-M3 (v1) and v1.1, each tagged with its PRD story IDs |
-| `blueprint/context/project-overview.md` | The compact overview `/overview` would generate, with the plan fingerprint |
-| `blueprint/config.json`, other `context/` and `history/` files | Blueprint defaults and stubs |
-
-## Next steps
-
-AI Blueprint is installed (Claude Code adapter) and onboarded. Settle the TODOs in
-`blueprint/project-plan.md` section 13, then run `/overview` (it refreshes the overview
-and offers the baseline commit) and `/feature` for Feature 1.
+| `blueprint/context/project-overview.md` | The compact overview agents read, with the plan fingerprint |
+| `blueprint/history/` | The archived spec, findings and independent review of every completed feature |

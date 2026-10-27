@@ -1,8 +1,9 @@
-# <name> CMS - Project Overview
+# Base - Project Overview
 
-<!-- blueprint:source-hash ca0011eeff6cacfe85011ede30bafbe21223834dad69afc40a87632fcd3c3702 -->
+<!-- blueprint:source-hash 7fd00656de9d5ffebcb43a66e344ef2ff4cdb6827d71a58a24eff8de719a1471 -->
 
-> An MIT-licensed, TypeScript, API-first CMS framework with MODX's resource tree, a
+> The tree-first CMS for developers, editors and AI agents. An MIT-licensed, TypeScript,
+> API-first CMS framework with MODX's resource tree, a
 > schema-driven admin for editors, and permissioned AI agents over MCP; paid add-ons
 > (AI pack, Team, Cloud) fund it.
 
@@ -52,7 +53,7 @@ rights per node and apply to descendants.
 8. Data-affecting schema changes need a version bump, a migration function and a dry run.
 9. Jobs idempotent with deterministic ids; webhooks HMAC-signed and retried.
 10. Tokens and preview links stored hashed; webhook secrets and AI provider keys sealed; secrets never returned or audited.
-11. The core never depends on `@<name>/ee-*`.
+11. The core never depends on `@base/ee-*`.
 
 ## Features
 
@@ -208,7 +209,7 @@ and `audit_log` shapes; later features add columns, never reshape them.
 Open core: Core free (MIT). **v1 AI runs on each site's own provider keys; no AI revenue in v1.**
 **AI pack** (hosted credits) ~$19/site/month with credits then usage (v1.1).
 **Team/Agency** ~$99/org/month (v1.1). **Cloud** from ~$25/month + usage (v1.1).
-**Marketplace** revenue share (v2). Paid code in `@<name>/ee-*`; license key per
+**Marketplace** revenue share (v2). Paid code in `@base/ee-*`; license key per
 production domain from v1.1; localhost and staging free; bring-your-own-key always allowed. Never
 paywall what a solo developer needs to launch.
 
@@ -230,7 +231,7 @@ width up; WCAG 2.1 AA. Editor creates and publishes a page in ≤ 2 minutes.
 - **API + worker:** one Docker image on Railway with two start commands; health check `GET /healthz` (assumed).
 - **Postgres 16 + pgvector, Redis:** Railway; daily backups, 30-day retention, monthly restore test.
 - **Media:** Cloudflare R2.
-- **Distribution:** npm `@<name>/*`, `create-<name>-app`, Docker image, local `docker compose`.
+- **Distribution:** npm `@base/*`, `create-base-app`, Docker image, local `docker compose`.
 - **Env vars:** `DATABASE_URL`, `REDIS_URL`, `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `MEDIA_PUBLIC_URL`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY` and `VOYAGE_API_KEY` (optional dev defaults; sites use their own keys), `SECRETS_KEY`, `PREVIEW_SECRET`, `REVALIDATE_SECRET`, `SENTRY_DSN`, `TELEMETRY`; `LICENSE_KEY` from v1.1.
 - **Jobs:** scheduled publish, async hooks, webhooks, embeddings, image variants, cache purge, trash purge, budget alerts.
 
@@ -243,5 +244,5 @@ width up; WCAG 2.1 AA. Editor creates and publishes a page in ≤ 2 minutes.
 > `sharp` for image variants, env var names.
 > TODO: milestone weeks are reconstructed; the PRD's milestone diagram was missing.
 > From the PRD: pilot site for M1-M2; paid-code licence model (decide before M3);
-> product name and domain; agent auto-publishing in v1; launch at beta or GA; Cloud
+> domain; agent auto-publishing in v1; launch at beta or GA; Cloud
 > regions and Southeast Asian data residency; Brunei PDPO compatibility.

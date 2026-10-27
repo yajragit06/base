@@ -7,8 +7,9 @@
 > and costs also live in a separate architecture doc (not part of this blueprint);
 > where it disagrees with this plan, update this plan and re-run `/overview`.
 >
-> The product name is not decided yet. `<name>` stands for it everywhere (npm scope
-> `@<name>/*`, CLI `<name>`, scaffolder `create-<name>-app`).
+> The product is named **Base** (tagline: "The tree-first CMS for developers, editors and
+> AI agents."): npm scope `@base/*`, CLI `base`, scaffolder `create-base-app`. The code
+> packages built so far still use the placeholder scope `@cms/*`.
 
 ## 1. Problem - What problem are we solving?
 
@@ -108,7 +109,7 @@ and tickets can reference them.
 - Trash with 30-day soft delete and restore [FR-1.6]
 
 **Rendering and extensions (developer)**
-- `create-<name>-app` scaffolds a Next.js site wired to the API with sample types [C1]
+- `create-base-app` scaffolds a Next.js site wired to the API with sample types [C1]
 - Registry mapping content type to layout and block to component; unknown blocks fail loudly in dev [C2]
 - Typed hooks, sync (2 s timeout, can cancel) or async on BullMQ with retries [C3]
 - `defineExtension()` packaging, installed via npm + CLI [C4]
@@ -201,8 +202,8 @@ architecture doc before Feature 1.
   Vitest for tests, `pnpm verify` as the umbrella check). Planned packages: `core` (content
   engine, commands, permissions), `schema` (`defineContentType`, field types, codegen),
   `api` (Delivery + Admin), `admin` (Next.js admin app), `worker` (BullMQ), `sdk`
-  (generated client), `cli`, `mcp`, `create-<name>-app`, `starter-next`, and paid
-  `@<name>/ee-*` packages kept separate (see section 6).
+  (generated client), `cli`, `mcp`, `create-base-app`, `starter-next`, and paid
+  `@base/ee-*` packages kept separate (see section 6).
 - **API server:** Fastify (decided). Must expose Delivery and Admin APIs and run on
   Railway or any Docker host.
 - **Database:** PostgreSQL 16+ with JSONB, `ltree` or materialized paths for the tree,
@@ -246,7 +247,7 @@ the first 10 production sites.
 **Packaging rules**
 
 1. Never paywall anything a solo developer needs to build and launch a site.
-2. Paid features live in separately licensed packages (`@<name>/ee-*`); the core never
+2. Paid features live in separately licensed packages (`@base/ee-*`); the core never
    imports them. The core exposes extension points that ee packages plug into.
 3. Paid add-ons unlock with a license key per production domain; `localhost` and staging
    are always free.
@@ -311,7 +312,7 @@ help (usability test with 3 editors).
 | Redis | Railway | Queues and cache |
 | Media | Cloudflare R2 | Public bucket or CDN in front |
 
-**Distribution:** npm packages under `@<name>/*`; `create-<name>-app` scaffolder; a
+**Distribution:** npm packages under `@base/*`; `create-base-app` scaffolder; a
 Docker image for API + worker; `docker compose` for local Postgres + Redis.
 
 **Env vars (by name, Assumption):** `DATABASE_URL`, `REDIS_URL`, `CLERK_SECRET_KEY`,
@@ -388,7 +389,7 @@ during `/onboard` once the code exists.
 11. **Jobs are idempotent** with deterministic job ids; webhooks are signed (HMAC) and retried.
 12. **Secrets:** tokens and preview links stored hashed; webhook secrets sealed; nothing
     secret returned by the API or written to the audit log.
-13. **Core never depends on `@<name>/ee-*`.**
+13. **Core never depends on `@base/ee-*`.**
 
 ## 11. Success metrics
 
@@ -461,7 +462,8 @@ re-embed job).
 
 - [ ] Which real site (yours or an early adopter's) is the pilot for M1-M2?
 - [ ] Paid-code licence: separate private packages or a source-available `ee/` folder? Decide before M3.
-- [ ] Product name and domain.
+- [x] Product name: **Base**.
+- [ ] Domain.
 - [ ] Is agent auto-publishing ever allowed in v1, or only from v1.1?
 - [ ] Public launch timing: open the repo at v1 beta or at v1 GA?
 - [ ] Cloud hosting regions and data residency for Southeast Asian customers.

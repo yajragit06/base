@@ -38,7 +38,7 @@ is a pre-build step done before Feature 1, not a feature.
 - [ ] 20. **Delivery API** - read-only API to get entries by URI or ID, list children and query by type and fields; published data only [FR-4.1]
 - [ ] 21. **Scoped API tokens** - hashed tokens scoped to site and read/write, revocable, last-used shown [E3, FR-6.1]
 - [ ] 22. **Codegen and typed SDK** - generated TS types and SDK cover every content type and work from React Native [E1, FR-2.3]
-- [ ] 23. **Site starter and create-app** - `create-<name>-app` scaffolds a Next.js site that resolves host to site and path to entry [C1, FR-7.1]
+- [ ] 23. **Site starter and create-app** - `create-base-app` scaffolds a Next.js site that resolves host to site and path to entry [C1, FR-7.1]
 - [ ] 24. **Layouts, blocks and loaders** - registry maps type to layout and block to component; loaders fetch extra data; unknown blocks fail loudly in dev [C2, FR-7.2]
 - [ ] 25. **Preview links** - a draft renders on the real site layout through a link that expires after 24 h [B3]
 - [ ] 26. **Publish to live in 10 seconds** - cache tags per entry; publishing purges Next.js and CDN caches [B4, FR-4.4]
