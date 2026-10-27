@@ -127,12 +127,12 @@ v2 (untracked): marketplace, sandboxed third-party code, visual page builder, ru
 
 ## Data model
 
-All tenant tables carry `site_id` (plus `tenant_id` from Feature 43) under RLS. Ids are
-UUIDs; times are `timestamptz`. **Locked by Features 2, 3 and 5:** `entries`, `versions`
+All tenant tables carry `site_id` (plus `tenant_id` from Feature 43) under RLS. Field
+content is JSONB validated by the content type's Zod schema. **Locked by Features 2, 3 and 5:** `entries`, `versions`
 and `audit_log` shapes; later features add columns, never reshape them.
 
 ### Site
-- `id`, `name`, `timeZone` (IANA), `defaultLocale`, `locales` (text[]), `settings` (jsonb), `aiSettings` (jsonb: provider, enabled, agentPublishing), `aiKeysSealed` (bytea, own provider keys; never returned)
+- `id`, `name`, `timeZone` (IANA), `defaultLocale`, `locales` (text[]), `settings` (jsonb), `aiSettings` (jsonb: provider, enabled, agentPublishing), `aiKeys` (sealed own provider keys; never returned or audited)
 - has many Domain, Entry, Media, Membership, ApiToken, Webhook
 
 ### Domain
@@ -187,7 +187,7 @@ and `audit_log` shapes; later features add columns, never reshape them.
 
 ## Tech stack
 
-- **TypeScript (strict), Node.js 22, pnpm + Turborepo, Biome** - all packages.
+- **TypeScript (strict, ESM), Node.js LTS, pnpm + Turborepo, Biome** - all packages; `pnpm verify` is the umbrella check.
 - **Fastify** - API server for Delivery, Admin and MCP-over-HTTP.
 - **PostgreSQL 16 + pgvector + RLS** - content, tree, vectors, isolation.
 - **Drizzle + pg** - ORM; forward-only migrations compatible with the previous release.
@@ -200,7 +200,8 @@ and `audit_log` shapes; later features add columns, never reshape them.
 - **Claude Sonnet 5.5 / Claude Haiku 5.5 / Voyage AI** - drafts and rewrites / short tasks / embeddings, behind a provider adapter.
 - **MCP** - agent interface.
 - **Sentry, structured logs, BullMQ dashboard** - observability.
-- **Vitest-style unit + real-Postgres integration tests, Playwright E2E, Lighthouse CI** - quality gates.
+- **Vitest** (≥ 80% core coverage), integration tests against real Postgres, **Playwright** E2E for every P0 story, **Lighthouse CI** on the starter - quality gates.
+- **Lemon Squeezy or Stripe** (v1.1, TODO) - billing with per-plan feature flags.
 
 ## Monetization
 
@@ -237,7 +238,9 @@ width up; WCAG 2.1 AA. Editor creates and publishes a page in ≤ 2 minutes.
 
 > TODO: multi-site is a free v1 P0 (D3) and also listed in the paid Team tier.
 > TODO: alt text required before publish; allow marking images decorative?
-> TODO: rich text editor and UI kit.
+> TODO: rich text editor and UI kit (needed by Features 6-7); billing provider (v1.1).
+> TODO: confirm assumptions: role matrix (before Feature 4), admin routes, `GET /healthz`,
+> `sharp` for image variants, env var names.
 > TODO: milestone weeks are reconstructed; the PRD's milestone diagram was missing.
 > From the PRD: pilot site for M1-M2; paid-code licence model (decide before M3);
 > product name and domain; agent auto-publishing in v1; launch at beta or GA; Cloud
