@@ -23,18 +23,26 @@
 **Suggested fix:** In the `site.addDomain` and `entry.create` success tests, destructure `[audit, ...rest]` and assert `rest` is empty, as the `site.create` test does. Add `actorType`, `actorId` and a `diff.after` match (domain id and host) to the `site.addDomain` assertion. Test-only change; no current requirement is lost.
 **Resolution:**
 
-### F-12 [P2] fixed - Owner bootstrap trusts an unverified provider email
-
-**File:** apps/api/src/auth.ts:45
-**Found:** 2026-10-27 by /audit independent (scope: current; lens: security)
-**Why it matters:** `clerkAuthAdapter.getProfile` copies `primaryEmailAddress.emailAddress` into `users.email` without reading its `verification.status`. The installed `@clerk/backend` 3.26.3 types this as `verification: Verification | null`, so Clerk can return an unverified primary address, for example a user created through the Backend API with verification skipped, or an instance that does not require verification at sign-up. `createSiteWithOwner` (apps/api/src/bootstrap.ts:25) then grants the Owner role to whichever single user holds that email. Someone who signs in first with an unverified copy of the intended owner's address would become Owner of the new site. If the real owner has also signed in, the script refuses with "More than one user". Exploiting it depends on how the Clerk instance is configured, so this is not P1, but the email is the only identity link the bootstrap trusts.
-**Suggested fix:** In `getProfile`, accept the primary email only when `verification?.status === "verified"`, and otherwise throw, as it already does for a missing email. Extend `ClerkCalls.getUser`'s return type and the stubbed test with a verified case and an unverified case. No current requirement is lost.
-**Resolution:** Fixed: the Clerk adapter's `getProfile` accepts the primary email only when `verification.status` is `verified` and otherwise throws `UnverifiedEmailError`; `requireUser` answers 403 `email_not_verified` and creates no user (apps/api/src/auth.ts). Tests cover verified, unverified, expired and missing verification (auth.test.ts) and the 403 with no user row (app.test.ts).
-
 ### F-13 [P3] open - Role check runs in a separate transaction from the command
 
 **File:** packages/core/src/permissions.ts:24
 **Found:** 2026-10-27 by /audit independent (scope: current; lens: security)
 **Why it matters:** `roleAuthorizer` reads the actor's membership through `getMembership`, which runs in its own `withSite` transaction. It is called from `runCommand` (packages/core/src/command.ts:69) before the command's transaction starts. If an Owner demotes an Admin to Viewer while that Admin's `membership.grant` (non-owner role) or `entry.create` is in flight, the Admin's write can still commit after the demotion. `membership.grant` re-reads the actor's role inside the locked transaction only for changes that involve Owner. The window is small and needs a concurrent demotion, so this is a consistency gap rather than a live escalation.
 **Suggested fix:** Run the authorizer inside the command's transaction: pass `tx` to the `Authorizer` and read the membership with `getMembershipInTx`. As a smaller alternative, have `membership.grant` re-check that the actor still holds an Owner or Admin role after taking the site row lock. Add a test for a demotion that happens during the command. No current requirement is lost.
+**Resolution:**
+
+### F-14 [P3] open - A sign-in with no primary email answers 500 with the internal message
+
+**File:** apps/api/src/auth.ts:299
+**Found:** 2026-10-27 by /audit independent (scope: current; lens: quality, security)
+**Why it matters:** `getProfile` throws a plain `Error` when the Clerk user has no primary email (possible on a Clerk instance that allows phone or username sign-in), and `requireUser` (auth.ts:337) rethrows anything other than `UnverifiedEmailError`. A probe with a fake adapter confirmed `GET /me` then returns 500 `{"statusCode":500,"error":"Internal Server Error","message":"Clerk user <id> has no primary email address."}` on every request. The `/me` contract lists only 200, 401 and 403, so the admin app gets an unstable error that looks like a server fault, and the internal message reaches the client. The request is still refused, so this is not an authorization gap.
+**Suggested fix:** Have `getProfile` throw a typed error for a missing email (or reuse `UnverifiedEmailError` with a reason) and map it in `requireUser` to a stable 403 such as `{ error: "email_required" }`. Add the case to `auth.test.ts` and an `app.inject` test that asserts no user row. No current requirement is lost.
+**Resolution:**
+
+### F-15 [P3] open - AGENTS.md test command omits that `@cms/api` tests now need TEST_DATABASE_URL
+
+**File:** AGENTS.md:387
+**Found:** 2026-10-27 by /audit independent (scope: current; lens: quality)
+**Why it matters:** The spec's Testing section says `apps/api` tests "now need `TEST_DATABASE_URL` like the other packages", and `apps/api/vitest.config.ts` throws without it. The Commands section still says only "`@cms/db` and `@cms/core` tests need `TEST_DATABASE_URL`", so the documented setup is incomplete for anyone running the API tests alone.
+**Suggested fix:** Change the line to "`@cms/db`, `@cms/core` and `@cms/api` tests need `TEST_DATABASE_URL` exported". Documentation only; no current requirement is lost.
 **Resolution:**

@@ -13,7 +13,7 @@ is a pre-build step done before Feature 1, not a feature.
 - [x] 1. **Content type definitions** - `defineContentType()` with Zod fields and the built-in field types produces TS types and API validation with field-level errors [A1, FR-2.1, FR-2.2]
 - [x] 2. **Sites and the content tree** - sites with domains and locales; entries stored as a per-site tree with parent, sort order, slug and computed URI [FR-1.1]
 - [x] 3. **Typed commands and audit log** - every write is a Zod-validated command with a permission check and an audit entry (user, agent or system) in the same transaction [FR-4.2, FR-6.3]
-- [ ] 4. **Sign-in and roles** - Clerk sign-in behind an auth adapter; Owner, Admin, Editor, Author, Viewer per site, enforced in the core [FR-6.1, FR-6.2]
+- [x] 4. **Sign-in and roles** - Clerk sign-in behind an auth adapter; Owner, Admin, Editor, Author, Viewer per site, enforced in the core [FR-6.1, FR-6.2]
 - [ ] 5. **Drafts and immutable versions** - field data stored per version and locale; saving creates a draft that never touches published content [FR-1.2, FR-1.3]
 
 ## M1 - Editing core (weeks 4-10) - Gate 1: pilot site modeled and edited in staging
