@@ -9,6 +9,7 @@ const { db } = useTestDb();
 const auth = fakeAuth({
   "token-ada": { authId: "user_ada", email: "Ada@Example.com", name: "Ada" },
   "token-bob": { authId: "user_bob", email: "bob@example.com", name: null },
+  "token-eve": { authId: "user_eve", email: "ada@example.com", name: "Eve", unverified: true },
 });
 const app = buildApp({ db, auth: auth.adapter });
 afterAll(() => app.close());
@@ -45,6 +46,17 @@ describe("GET /me", () => {
       expect(res.statusCode).toBe(401);
       expect(res.json()).toEqual({ error: "unauthenticated" });
     }
+    expect(await userCount()).toBe(0);
+  });
+
+  it("refuses a person whose email is not verified, without creating a user", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/me",
+      headers: { authorization: "Bearer token-eve" },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "email_not_verified" });
     expect(await userCount()).toBe(0);
   });
 

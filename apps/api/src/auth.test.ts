@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type ClerkCalls, clerkAuthAdapter } from "./auth.js";
+import { type ClerkCalls, clerkAuthAdapter, UnverifiedEmailError } from "./auth.js";
 
 function stubClerk(overrides: Partial<ClerkCalls> = {}): ClerkCalls {
   return {
@@ -8,7 +8,13 @@ function stubClerk(overrides: Partial<ClerkCalls> = {}): ClerkCalls {
       return { sub: "user_123" };
     },
     async getUser() {
-      return { primaryEmailAddress: { emailAddress: "Ada@Example.com" }, fullName: "Ada Lovelace" };
+      return {
+        primaryEmailAddress: {
+          emailAddress: "Ada@Example.com",
+          verification: { status: "verified" },
+        },
+        fullName: "Ada Lovelace",
+      };
     },
     ...overrides,
   };
@@ -35,5 +41,19 @@ describe("clerkAuthAdapter", () => {
       stubClerk({ getUser: async () => ({ primaryEmailAddress: null, fullName: null }) }),
     );
     await expect(noEmail.getProfile("user_123")).rejects.toThrow("no primary email");
+  });
+
+  it("refuses a primary email Clerk has not verified, or has no verification for", async () => {
+    for (const verification of [{ status: "unverified" }, { status: "expired" }, null]) {
+      const adapter = clerkAuthAdapter(
+        stubClerk({
+          getUser: async () => ({
+            primaryEmailAddress: { emailAddress: "ada@example.com", verification },
+            fullName: null,
+          }),
+        }),
+      );
+      await expect(adapter.getProfile("user_123")).rejects.toBeInstanceOf(UnverifiedEmailError);
+    }
   });
 });

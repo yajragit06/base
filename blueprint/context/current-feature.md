@@ -87,6 +87,12 @@ review will be selected before `/complete`.
   **Done when:** an integration test runs the script's function end to end (site
   created, Owner granted, two audit rows), it fails clearly when the email matches no
   user or more than one, and `pnpm verify` passes.
+- [x] 6. **Repair review finding F-12.** The Clerk adapter accepts a primary email only
+  when Clerk reports it verified; otherwise `getProfile` throws `UnverifiedEmailError`,
+  and `requireUser` answers 403 `{ error: "email_not_verified" }` without creating a user.
+  **Done when:** the stubbed-Clerk test covers verified, unverified and missing
+  verification; an `app.inject` test proves an unverified person gets 403 and no user
+  row; F-12 is marked `fixed`; and `pnpm verify` passes.
 
 ## Files / areas
 
@@ -171,7 +177,10 @@ and reads the user's primary email and name from Clerk only when needed. The API
 `Authorization: Bearer <token>`; anything else is unauthenticated.
 
 **`GET /me`** - 200 `{ user: { id, email, name }, memberships: [{ siteId, siteName,
-role }] }` for a valid token; 401 `{ error: "unauthenticated" }` otherwise. It creates
+role }] }` for a valid token; 401 `{ error: "unauthenticated" }` otherwise; 403
+`{ error: "email_not_verified" }` the first time a person whose primary email Clerk has
+not verified signs in (no user is created, because the email is what the Owner bootstrap
+trusts). It creates
 the user on first sight (by `auth_id`, idempotent under concurrency). Provisioning a user
 mirrors the identity provider and is not audited: `audit_log` rows belong to a site, and
 no site is changed.
