@@ -1,8 +1,18 @@
-export default function HomePage() {
+import { redirect } from "next/navigation";
+import { apiGet, type Me } from "@/lib/api";
+
+export default async function HomePage() {
+  const me = await apiGet<Me>("/me");
+  const first = me.memberships[0];
+  if (first) redirect(`/sites/${first.siteId}`);
   return (
-    <main>
-      <h1>CMS Admin</h1>
-      <p>The tree and entry editor arrive in Features 6 and 7.</p>
+    <main className="grid min-h-screen place-items-center p-4">
+      <div className="max-w-sm text-center">
+        <h1 className="text-lg font-semibold">You are not on any site yet</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Ask a site owner or admin to add you. You are signed in as {me.user.email}.
+        </p>
+      </div>
     </main>
   );
 }

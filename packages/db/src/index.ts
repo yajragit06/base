@@ -9,14 +9,24 @@ export {
   getEntry,
   getEntryByUri,
   listChildren,
+  listChildrenPage,
   type NewEntry,
+  type TreeNode,
+  type TreePage,
 } from "./entries.js";
 export { DbError, type DbErrorCode } from "./errors.js";
 export { runMigrations, truncateAllTables } from "./migrations.js";
 export type { AuditEntry, Domain, Entry, Membership, Site, User, Version } from "./schema.js";
 export { ROLES, type Role, VERSION_STATUSES, type VersionStatus } from "./schema.js";
 export { type Executor, type SiteTx, withSite, withUser } from "./site-scope.js";
-export { addDomain, createSite, findSiteByHost, listSites, type NewSite } from "./sites.js";
+export {
+  addDomain,
+  createSite,
+  findSiteByHost,
+  isUuid,
+  listSites,
+  type NewSite,
+} from "./sites.js";
 export {
   countOwnersInTx,
   findOrCreateUser,

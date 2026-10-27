@@ -1,4 +1,5 @@
-import { and, asc, eq, isNull, max } from "drizzle-orm";
+import { and, asc, eq, exists, gt, isNull, max, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { DbError, UNIQUE_VIOLATION, violatedConstraint } from "./errors.js";
 import type { Db } from "./index.js";
 import { type Entry, entries, sites } from "./schema.js";
@@ -156,4 +157,123 @@ export async function listChildren(
       )
       .orderBy(asc(entries.sortOrder), asc(entries.id)),
   );
+}
+
+export interface TreeNode {
+  id: string;
+  parentId: string | null;
+  slug: string;
+  uri: string;
+  typeKey: string;
+  sortOrder: number;
+  hasChildren: boolean;
+}
+
+export interface TreePage {
+  items: TreeNode[];
+  nextCursor: string | null;
+}
+
+const DEFAULT_PAGE = 100;
+const MAX_PAGE = 200;
+
+interface Cursor {
+  s: number;
+  i: string;
+}
+
+function encodeCursor(node: TreeNode): string {
+  return Buffer.from(JSON.stringify({ s: node.sortOrder, i: node.id })).toString("base64url");
+}
+
+function decodeCursor(cursor: string): Cursor {
+  try {
+    const value: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      Number.isSafeInteger((value as Cursor).s) &&
+      typeof (value as Cursor).i === "string" &&
+      isUuid((value as Cursor).i)
+    ) {
+      return { s: (value as Cursor).s, i: (value as Cursor).i };
+    }
+  } catch {
+    // Falls through to the error below.
+  }
+  throw new DbError("invalid_cursor", "The page cursor is not valid.");
+}
+
+/** The query behind `listChildrenPage`, exported for its query-plan test. */
+export function childrenPageQuery(
+  tx: Executor,
+  siteId: string,
+  parentId: string | null,
+  cursor: { s: number; i: string } | undefined,
+  limit: number,
+) {
+  const child = alias(entries, "child");
+  return tx
+    .select({
+      id: entries.id,
+      parentId: entries.parentId,
+      slug: entries.slug,
+      uri: entries.uri,
+      typeKey: entries.typeKey,
+      sortOrder: entries.sortOrder,
+      hasChildren: exists(
+        tx
+          .select({ one: sql`1` })
+          .from(child)
+          .where(and(eq(child.siteId, siteId), eq(child.parentId, entries.id))),
+      ).mapWith(Boolean),
+    })
+    .from(entries)
+    .where(
+      and(
+        eq(entries.siteId, siteId),
+        parentId === null ? isNull(entries.parentId) : eq(entries.parentId, parentId),
+        cursor === undefined
+          ? undefined
+          : or(
+              gt(entries.sortOrder, cursor.s),
+              and(eq(entries.sortOrder, cursor.s), gt(entries.id, cursor.i)),
+            ),
+      ),
+    )
+    .orderBy(asc(entries.sortOrder), asc(entries.id))
+    .limit(limit);
+}
+
+/**
+ * One page of a node's children (or the site's top level) in tree order, each with
+ * `hasChildren`. Keyset paging on `(sort_order, id)` keeps every page cheap.
+ */
+export async function listChildrenPage(
+  db: Db,
+  siteId: string,
+  parentId: string | null,
+  options: { after?: string; limit?: number } = {},
+): Promise<TreePage> {
+  assertSiteId(siteId);
+  if (parentId !== null && !isUuid(parentId)) {
+    throw new DbError("parent_not_found", "Parent entry not found.");
+  }
+  const cursor = options.after === undefined ? undefined : decodeCursor(options.after);
+  const requested = Number.isFinite(options.limit) ? Math.trunc(options.limit ?? 0) : DEFAULT_PAGE;
+  const limit = Math.min(Math.max(requested, 1), MAX_PAGE);
+
+  return withSite(db, siteId, async (tx) => {
+    if (parentId !== null) {
+      const [parent] = await tx
+        .select({ id: entries.id })
+        .from(entries)
+        .where(and(eq(entries.siteId, siteId), eq(entries.id, parentId)));
+      if (!parent) throw new DbError("parent_not_found", "Parent entry not found.");
+    }
+    const rows = await childrenPageQuery(tx, siteId, parentId, cursor, limit + 1);
+    const items = rows.slice(0, limit);
+    const last = items.at(-1);
+    return { items, nextCursor: rows.length > limit && last ? encodeCursor(last) : null };
+  });
 }

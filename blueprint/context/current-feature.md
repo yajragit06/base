@@ -3,7 +3,7 @@
 **From build-plan:** feature 6
 **Build attempt:** 1
 **Branch:** feature/admin-shell-and-tree
-**Status:** draft
+**Status:** verified
 
 ## Goal
 
@@ -49,7 +49,7 @@ be selected before `/complete`.
 
 ## Build steps
 
-- [ ] 1. **Paged children in `@cms/db`.** `listChildrenPage(db, siteId, parentId,
+- [x] 1. **Paged children in `@cms/db`.** `listChildrenPage(db, siteId, parentId,
   { after?, limit? })` returns `{ items, nextCursor }` in tree order, each item with
   `hasChildren`, using keyset paging on `(sort_order, id)` and the existing
   `entries_site_parent_idx`.
@@ -58,14 +58,14 @@ be selected before `/complete`.
   leaf and parent nodes; an unknown parent or another site's parent returns
   `parent_not_found`; another site's entries never appear; and an `EXPLAIN` test on a
   5,000-entry site shows no sequential scan of `entries`.
-- [ ] 2. **`GET /sites/:siteId/tree`.** A `requireSiteMember` pre-handler (after
+- [x] 2. **`GET /sites/:siteId/tree`.** A `requireSiteMember` pre-handler (after
   `requireUser`) loads the caller's membership on the site; the handler calls
   `listChildrenPage`.
   **Done when:** `app.inject` tests prove 401 without a token; 403 for a non-member and
   for a member of another site (cross-site); 200 for a Viewer; 404 for an unknown or
   malformed site id and for a parent outside the site; 400 for a bad cursor or limit;
   and paging returns `nextCursor` until the last page.
-- [ ] 3. **Admin foundation.** Add Tailwind CSS 4 and shadcn/ui (`components.json`,
+- [x] 3. **Admin foundation.** Add Tailwind CSS 4 and shadcn/ui (`components.json`,
   `lib/utils.ts`, only the components used); `@clerk/nextjs` with `ClerkProvider`, a
   `proxy.ts` that protects every route except `/sign-in`, and `/sign-in/[[...sign-in]]`;
   `lib/api.ts`, a server-only client that calls `API_URL` with `Authorization: Bearer`
@@ -75,7 +75,7 @@ be selected before `/complete`.
   **Done when:** `pnpm --filter @cms/admin typecheck` and `build` pass without Clerk keys
   (pages render dynamically, so nothing needs keys at build time), `.env.example` lists
   the new variables, and the page title is "Base".
-- [ ] 4. **Shell, site switcher and tree.** `/sites/[siteId]` layout: a header with the
+- [x] 4. **Shell, site switcher and tree.** `/sites/[siteId]` layout: a header with the
   product mark, the site switcher (sites from `/me`) and Clerk's user button; a tree pane
   and a main pane. The tree is a client component fed by server actions that call the
   tree route: lazy children on expand, "Show more" for `nextCursor`, and the states below.
@@ -83,7 +83,7 @@ be selected before `/complete`.
   loading and error per node) and keyboard moves (Up, Down, Right to expand or enter,
   Left to collapse or go to the parent, Home, End, Enter to select); `typecheck` and
   `build` pass; and a 403 or 404 from the API shows the not-found page, not a crash.
-- [ ] 5. **Docs and final gate.** Document the route, the admin env vars and the
+- [x] 5. **Docs and final gate.** Document the route, the admin env vars and the
   site-scoped URL rule in `AGENTS.md`.
   **Done when:** `pnpm verify` passes and there is no migration drift.
 
