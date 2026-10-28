@@ -7,6 +7,7 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
+
 ### F-10 [P3] open - Host ports with leading zeros bypass install-wide host uniqueness
 
 **File:** packages/db/src/sites.ts:7
@@ -37,14 +38,6 @@
 **Found:** 2026-10-27 by /audit independent (scope: current; lens: quality, security)
 **Why it matters:** `getProfile` throws a plain `Error` when the Clerk user has no primary email (possible on a Clerk instance that allows phone or username sign-in), and `requireUser` (auth.ts:337) rethrows anything other than `UnverifiedEmailError`. A probe with a fake adapter confirmed `GET /me` then returns 500 `{"statusCode":500,"error":"Internal Server Error","message":"Clerk user <id> has no primary email address."}` on every request. The `/me` contract lists only 200, 401 and 403, so the admin app gets an unstable error that looks like a server fault, and the internal message reaches the client. The request is still refused, so this is not an authorization gap.
 **Suggested fix:** Have `getProfile` throw a typed error for a missing email (or reuse `UnverifiedEmailError` with a reason) and map it in `requireUser` to a stable 403 such as `{ error: "email_required" }`. Add the case to `auth.test.ts` and an `app.inject` test that asserts no user row. No current requirement is lost.
-**Resolution:**
-
-### F-15 [P3] open - AGENTS.md test command omits that `@cms/api` tests now need TEST_DATABASE_URL
-
-**File:** AGENTS.md:387
-**Found:** 2026-10-27 by /audit independent (scope: current; lens: quality)
-**Why it matters:** The spec's Testing section says `apps/api` tests "now need `TEST_DATABASE_URL` like the other packages", and `apps/api/vitest.config.ts` throws without it. The Commands section still says only "`@cms/db` and `@cms/core` tests need `TEST_DATABASE_URL`", so the documented setup is incomplete for anyone running the API tests alone.
-**Suggested fix:** Change the line to "`@cms/db`, `@cms/core` and `@cms/api` tests need `TEST_DATABASE_URL` exported". Documentation only; no current requirement is lost.
 **Resolution:**
 
 ### F-18 [P3] open - No test proves a saved draft stores the validated data rather than the raw input
@@ -99,4 +92,57 @@
 **Found:** 2026-10-28 by /audit independent (scope: current; lens: quality)
 **Why it matters:** Every failed load sets the same `announcement` string. After the first failure the state does not change, so React leaves the `aria-live` text untouched, and screen readers announce nothing when a Retry fails again. Focus stays on the same Retry row, so nothing else signals the second failure either. The spec says the error state is "announced through an aria-live region".
 **Suggested fix:** Clear the announcement when a load starts, or vary the text (for example include the attempt count), so each failure changes the live region. No current requirement is lost.
+**Resolution:**
+
+### F-32 [P2] fixed - `?sslmode=require` makes node-postgres verify the certificate, which may reject a hosted Supabase connection
+
+**File:** README.md:62
+**Found:** 2026-10-28 by /audit independent (scope: current; lens: quality)
+**Why it matters:**
+- README, AGENTS.md and `.env.example` tell users to add `?sslmode=require` to the session pooler URL.
+- The installed `pg` 8.23.1 / `pg-connection-string` 2.14.1 treat `require` as `verify-full`. A run printed "SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'".
+- If the hosted Supabase database or pooler certificate chains to Supabase's own CA rather than a CA in Node's trust store, `pnpm db:migrate` and `pnpm db:doctor` will fail with a certificate-chain error on the documented setup.
+- Not confirmed: no hosted project or network access was available.
+
+**Suggested fix:** Run `pnpm db:doctor` against a hosted project with the documented URL. If it fails, document `sslmode=verify-full&sslrootcert=<path to the CA certificate downloaded from the dashboard>`. No current requirement is lost.
+**Resolution:** Fixed in the docs (Feature 7 step 6): README, AGENTS.md and .env.example now give `?sslmode=verify-full&sslrootcert=<Supabase CA certificate>` (downloaded from Database settings > SSL configuration) instead of a bare `sslmode=require`; the installed `pg-connection-string` reads `sslrootcert` into `ssl.ca` (checked). Still to confirm on a hosted project: the user runs `pnpm db:migrate` and `pnpm db:doctor` with that URL. 2026-10-28 independent review of 585a6d8..4b1bcf1: the documented approach (verify-full plus Supabase's dashboard CA certificate as `sslrootcert`) is sound in principle, but a hosted run is impossible here, so it stays `fixed`. The README's example relative path does not work as written (F-34).
+
+### F-34 [P3] open - README's example `sslrootcert=certs/supabase-ca.crt` is resolved from packages/db, so the documented hosted setup fails
+
+**File:** README.md:66
+**Found:** 2026-10-28 by /audit independent (scope: current; lens: quality)
+**Why it matters:**
+- README step 2 says to keep the CA certificate "next to the app, for example `certs/supabase-ca.crt`", and step 3 puts `sslrootcert=certs/supabase-ca.crt` in `DATABASE_URL`.
+- pg-connection-string reads `sslrootcert` with `fs.readFileSync` relative to the process's working directory. `pnpm db:migrate` (turbo) and `pnpm db:doctor` (`pnpm --filter @cms/db run doctor`) run in `packages/db`, and the API runs in `apps/api`.
+- A probe from the repo root with `sslrootcert=README.md`, a file that exists at the root but not in packages/db, made `pnpm db:doctor` print "Could not run the checks: ENOENT: no such file or directory, open 'README.md'", and `pnpm db:migrate` failed the same way.
+- No single relative path works for both the migrations and the app, so following the README literally fails on the hosted setup. The error is clear, so this is not silent.
+
+**Suggested fix:** Document an absolute path (for example `sslrootcert=/abs/path/supabase-ca.crt`) in README, AGENTS.md and .env.example, and say that relative paths resolve from each package's directory. Documentation only; no current requirement is lost.
+**Resolution:**
+
+### F-35 [P3] open - No test covers doctor's PostgreSQL 16 SET check, its TRUNCATE/REFERENCES/TRIGGER clause, or create-test-db's host check
+
+**File:** packages/db/src/doctor.test.ts:55
+**Found:** 2026-10-28 by /audit independent (scope: current; lens: tests)
+**Why it matters:**
+- Step 6's Done-when says each finding has a test or doc change that would fail without the fix.
+- The role fail test uses a login role with no cms_app membership at all, so it still fails if the `'SET'` branch is reverted to `'MEMBER'`.
+- No test grants TRUNCATE, REFERENCES or TRIGGER, so dropping those from `has_table_privilege` passes the suite.
+- create-test-db's host check (F-30) is proven only by a manual run.
+- Probes confirm the code behaves correctly today (SET FALSE fails, SET TRUE passes; TRUNCATE, TRIGGER and column REFERENCES grants fail), so this is a regression gap, not a live defect.
+
+**Suggested fix:** In doctor.test.ts, add a case that grants `cms_app TO <probe> WITH SET FALSE` (on PostgreSQL 16+) and expects `role` to fail, and a case that grants `TRUNCATE ON sites TO anon` and expects `api roles` to fail. Optionally, extract create-test-db's URL check into a pure function with a unit test. Test-only change; no current requirement is lost.
+**Resolution:**
+
+### F-36 [P3] open - create-test-db prints the full URL, password included, when a URL is malformed
+
+**File:** packages/db/src/create-test-db.ts:166
+**Found:** 2026-10-28 by /audit independent (scope: current; lens: security)
+**Why it matters:**
+- `new URL(testUrl)` and `new URL(adminUrl)` run outside any try/catch.
+- A malformed `TEST_DATABASE_URL` or `DATABASE_URL` crashes with Node's uncaught `ERR_INVALID_URL`. Node prints that error's `input` property, which is the full connection string including the password (confirmed by a probe with a dummy password).
+- The spec's notes say never to print `DATABASE_URL` or any password. db:doctor honours that (it prints only "Invalid URL").
+- The output goes only to the developer's own terminal, and CI passes valid URLs, so the exposure is small.
+
+**Suggested fix:** Parse both URLs in a try/catch and print a fixed message such as "DATABASE_URL or TEST_DATABASE_URL is not a valid URL." without the value. No current requirement is lost.
 **Resolution:**
