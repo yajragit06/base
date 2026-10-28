@@ -49,6 +49,9 @@ export function PageTree({
   );
   const [announcement, setAnnouncement] = useState("");
   const treeRef = useRef<HTMLDivElement>(null);
+  // Whether keyboard focus was last inside the tree. A removed row (a status row after the
+  // last page loads) drops DOM focus to the body, which must not count as leaving.
+  const focusWithin = useRef(false);
 
   const load = useCallback(
     async (parent: string, after: string | null) => {
@@ -70,10 +73,13 @@ export function PageTree({
 
   // Keep DOM focus on the focused row while the tree has focus (roving tabindex).
   useEffect(() => {
-    if (!treeRef.current?.contains(document.activeElement) || state.focusedId === null) return;
-    treeRef.current
-      .querySelector<HTMLElement>(`[data-id="${CSS.escape(state.focusedId)}"]`)
-      ?.focus();
+    const tree = treeRef.current;
+    if (!tree || state.focusedId === null) return;
+    const active = document.activeElement;
+    const inTree = tree.contains(active);
+    const dropped = focusWithin.current && (active === null || active === document.body);
+    if (!inTree && !dropped) return;
+    tree.querySelector<HTMLElement>(`[data-id="${CSS.escape(state.focusedId)}"]`)?.focus();
   }, [state.focusedId]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -89,7 +95,23 @@ export function PageTree({
 
   return (
     <>
-      <div ref={treeRef} role="tree" aria-label="Pages" className="text-sm" onKeyDown={onKeyDown}>
+      <div
+        ref={treeRef}
+        role="tree"
+        aria-label="Pages"
+        className="text-sm"
+        onKeyDown={onKeyDown}
+        onFocus={() => {
+          focusWithin.current = true;
+        }}
+        onBlur={(event) => {
+          // Only a move to another element outside the tree counts as leaving it.
+          const next = event.relatedTarget;
+          if (next instanceof Node && !event.currentTarget.contains(next)) {
+            focusWithin.current = false;
+          }
+        }}
+      >
         {visibleRows(state).map((row) =>
           row.kind === "node" ? (
             <PageRow key={row.id} row={row} state={state} dispatch={dispatch} />

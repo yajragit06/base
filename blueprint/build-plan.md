@@ -18,7 +18,7 @@ is a pre-build step done before Feature 1, not a feature.
 
 ## M1 - Editing core (weeks 4-10) - Gate 1: pilot site modeled and edited in staging
 
-- [ ] 6. **Admin shell and tree** - admin app with site switcher and a lazily loaded tree that stays fast at 5,000 nodes [B1, FR-3.1]
+- [x] 6. **Admin shell and tree** - admin app with site switcher and a lazily loaded tree that stays fast at 5,000 nodes [B1, FR-3.1]
 - [ ] 7. **Schema-driven entry editor** - forms rendered from content types with 10 s autosave of drafts [B2, FR-3.2, FR-3.5]
 - [ ] 8. **Move, reorder and redirects** - drag-and-drop in the tree rebuilds descendant URIs and writes 301 redirects [B1, FR-1.4]
 - [ ] 9. **Publish and version history** - publish or unpublish now; history shows author, time and AI/human actor with diff; restore creates a new draft [B4, B5, FR-3.3]
