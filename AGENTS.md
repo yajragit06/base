@@ -44,7 +44,7 @@ order are in `blueprint/context/project-overview.md`; the full plan is
   `withSite()`, which every site-scoped query runs inside: it switches to the `cms_app`
   role so row-level security applies, even when connected as a superuser. Every Base table
   has row-level security, and migration 0008 revokes all privileges of Supabase's Data API
-  roles (`anon`, `authenticated`) on `public` (rule 14). `doctor.ts` holds the read-only
+  roles (`anon`, `authenticated`, and in 0009 `service_role`) on `public` (rule 14). `doctor.ts` holds the read-only
   `db:doctor` checks.
 - `packages/schema` `defineContentType`, `defineBlock`, the `field` builders, `EntryData`
   and `validateEntry` (field-level errors with stable codes).
@@ -401,11 +401,14 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
 - Local database: `pnpm db:start` (local Supabase through the pinned Supabase CLI; needs
   Docker), `pnpm db:stop`. `supabase/config.toml` keeps `public` out of the Data API. Any
   Postgres 15+ works through `DATABASE_URL`.
-- Hosted Supabase: `DATABASE_URL` is the session pooler URL (port 5432) with
-  `?sslmode=require`, never the transaction pooler; turn off the Data API (or remove
-  `public` from its exposed schemas) in the dashboard.
-- Database check: `pnpm db:doctor` reports migrations, `cms_app` membership, Data API role
-  privileges and row-level security for `DATABASE_URL`, and exits non-zero on a failure.
+- Hosted Supabase (its own project; migrations 0008-0009 close all of `public` to the Data
+  API roles): `DATABASE_URL` is the session pooler URL (port 5432) with
+  `?sslmode=verify-full&sslrootcert=<Supabase CA certificate file>`, never the transaction
+  pooler; turn off the Data API (or remove `public` from its exposed schemas) in the
+  dashboard.
+- Database check: `pnpm db:doctor` reports migrations, whether the user can switch to
+  `cms_app`, any Data API role privilege (table or column) and row-level security for
+  `DATABASE_URL`, and exits non-zero on a failure.
 - Dev servers: `pnpm dev` (API http://localhost:4000, `GET /healthz`; admin http://localhost:3000)
 - Build: `pnpm build`
 - Production servers: `pnpm --filter @cms/api start`, `pnpm --filter @cms/admin start`

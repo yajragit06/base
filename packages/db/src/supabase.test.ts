@@ -9,9 +9,9 @@ import { testDatabaseUrl } from "./test/db.js";
 import { findOrCreateUser, setMembershipInTx } from "./users.js";
 
 // A fresh database set up the way Supabase sets up its projects: the Data API roles
-// `anon` and `authenticated` exist and get every privilege on new public tables by
-// default. Base's migrations must take those privileges away (rule 14).
-const API_ROLES = ["anon", "authenticated"] as const;
+// `anon`, `authenticated` and `service_role` exist and get every privilege on new public
+// tables by default. Base's migrations must take those privileges away (rule 14).
+const API_ROLES = ["anon", "authenticated", "service_role"] as const;
 const name = `base_supabase_${process.pid}`;
 const adminUrl = testDatabaseUrl();
 const freshUrl = (() => {
@@ -21,6 +21,25 @@ const freshUrl = (() => {
 })();
 
 let handle: { db: Db; pool: pg.Pool };
+
+// These tests create a database and roles; skip them (loudly) where the test user can't.
+const canCreate = await (async () => {
+  const client = new pg.Client({ connectionString: adminUrl });
+  await client.connect();
+  try {
+    const { rows } = await client.query<{ ok: boolean }>(
+      "SELECT (rolsuper OR (rolcreatedb AND rolcreaterole)) AS ok FROM pg_roles WHERE rolname = current_user",
+    );
+    return rows[0]?.ok === true;
+  } finally {
+    await client.end();
+  }
+})();
+if (!canCreate) {
+  console.warn(
+    "Skipping the Supabase-like database tests: the test user needs CREATEDB and CREATEROLE.",
+  );
+}
 
 async function admin<T>(fn: (client: pg.Client) => Promise<T>): Promise<T> {
   const client = new pg.Client({ connectionString: adminUrl });
@@ -33,6 +52,7 @@ async function admin<T>(fn: (client: pg.Client) => Promise<T>): Promise<T> {
 }
 
 beforeAll(async () => {
+  if (!canCreate) return;
   await admin(async (client) => {
     await client.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
     await client.query(`CREATE DATABASE ${name}`);
@@ -59,8 +79,15 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  if (!canCreate) return;
   await handle?.pool.end();
-  await admin((client) => client.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`));
+  await admin(async (client) => {
+    await client.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    // Leave the test user as it was; the roles themselves are shared by the server.
+    for (const role of API_ROLES) {
+      await client.query(`REVOKE ${role} FROM CURRENT_USER`).catch(() => undefined);
+    }
+  });
 });
 
 async function baseTables(): Promise<string[]> {
@@ -70,7 +97,7 @@ async function baseTables(): Promise<string[]> {
   return rows.map((r) => r.tablename);
 }
 
-describe("on a Supabase-like database", () => {
+describe.skipIf(!canCreate)("on a Supabase-like database", () => {
   it("gives the Data API roles no privilege on any Base table", async () => {
     const tables = await baseTables();
     expect(tables).toEqual(
@@ -95,6 +122,22 @@ describe("on a Supabase-like database", () => {
           });
         }
       }
+    }
+  });
+
+  it("keeps the API roles off tables created after the migrations", async () => {
+    // Supabase grants every new table to the API roles by default; 0008 and 0009 revoke
+    // those defaults for the migrating user, so a later table stays closed too.
+    await handle.db.execute(sql`CREATE TABLE later_table (id int)`);
+    try {
+      for (const role of API_ROLES) {
+        const { rows } = await handle.db.execute<{ allowed: boolean }>(
+          sql`SELECT has_table_privilege(${role}, 'public.later_table', 'SELECT') AS allowed`,
+        );
+        expect({ role, allowed: rows[0]?.allowed }).toEqual({ role, allowed: false });
+      }
+    } finally {
+      await handle.db.execute(sql`DROP TABLE later_table`);
     }
   });
 
@@ -147,7 +190,7 @@ describe("on a Supabase-like database", () => {
   });
 });
 
-describe("cms_app on the newly secured tables", () => {
+describe.skipIf(!canCreate)("cms_app on the newly secured tables", () => {
   it("sees only its own site and domains inside withSite", async () => {
     const base = { timeZone: "UTC", defaultLocale: "en", locales: ["en"] };
     const a = await createSite(handle.db, { ...base, name: "Scope A" });
@@ -166,6 +209,43 @@ describe("cms_app on the newly secured tables", () => {
         tx.execute(sql`UPDATE sites SET name = 'x' WHERE id = ${a.id}`),
       ),
     ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/row-level security/) } });
+  });
+
+  it("cannot write another site's domain, lock another site, or see non-member users", async () => {
+    const base = { timeZone: "UTC", defaultLocale: "en", locales: ["en"] };
+    const a = await createSite(handle.db, { ...base, name: "Policy A" });
+    const b = await createSite(handle.db, { ...base, name: "Policy B" });
+    await expect(
+      withSite(handle.db, a.id, (tx) =>
+        tx.execute(sql`INSERT INTO domains (site_id, host) VALUES (${b.id}, 'stray.example')`),
+      ),
+    ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/row-level security/) } });
+    const locked = await withSite(handle.db, a.id, async (tx) => {
+      const own = await tx.execute(sql`SELECT id FROM sites WHERE id = ${a.id} FOR NO KEY UPDATE`);
+      const other = await tx.execute(
+        sql`SELECT id FROM sites WHERE id = ${b.id} FOR NO KEY UPDATE`,
+      );
+      return [own.rows.length, other.rows.length];
+    });
+    expect(locked).toEqual([1, 0]);
+
+    const member = await findOrCreateUser(handle.db, {
+      authId: "auth_policy_member",
+      email: "pm@example.com",
+      name: null,
+    });
+    const stranger = await findOrCreateUser(handle.db, {
+      authId: "auth_policy_stranger",
+      email: "ps@example.com",
+      name: null,
+    });
+    await withSite(handle.db, a.id, (tx) => setMembershipInTx(tx, a.id, member.id, "viewer"));
+    await withSite(handle.db, b.id, (tx) => setMembershipInTx(tx, b.id, stranger.id, "viewer"));
+    const seen = await withSite(handle.db, a.id, async (tx) => {
+      const { rows } = await tx.execute<{ id: string }>(sql`SELECT id FROM users`);
+      return rows.map((r) => r.id);
+    });
+    expect(seen).toEqual([member.id]);
   });
 
   it("sees the user's member sites and the user row inside withUser", async () => {

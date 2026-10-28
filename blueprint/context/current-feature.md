@@ -93,6 +93,19 @@ independent review will be selected before `/complete`.
   short "Supabase" section (session pooler URL with `sslmode=require`, turn off the Data
   API in the dashboard, run `pnpm db:migrate` then `pnpm db:doctor`).
   **Done when:** `pnpm verify` passes and there is no migration drift.
+- [x] 6. **Repair review findings F-27 to F-33.** A forward migration revokes the same
+  privileges and defaults from `service_role` (F-27); `db:doctor` also checks
+  `service_role`, column-level grants, TRUNCATE/REFERENCES/TRIGGER, and that the user can
+  `SET ROLE cms_app` (F-28), and prints the underlying connection error (F-29);
+  `create-test-db` refuses when the two URLs name different servers (F-30); README says
+  Base needs its own Supabase project and that 0008 closes all of `public` (F-31), and
+  documents certificate verification with Supabase's CA certificate instead of a bare
+  `sslmode=require` (F-32, still to be confirmed on a hosted project); and the tests cover
+  the default-privilege revoke, cross-site domain inserts, the users policy, the lock
+  policy, doctor's `migrations` and `role` failures, and skip without `CREATEDB` (F-33).
+  **Done when:** each finding has a test or doc change that would fail or read wrong
+  without the fix; F-27 to F-31 and F-33 are marked `fixed`, F-32 `fixed` (docs) with its
+  hosted check still open; the Supabase CI job passes; and `pnpm verify` passes.
 
 ## Files / areas
 

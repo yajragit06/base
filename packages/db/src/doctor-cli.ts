@@ -13,8 +13,10 @@ try {
   console.log(formatChecks(checks));
   process.exitCode = checks.every((c) => c.ok) ? 0 : 1;
 } catch (error) {
-  // The message of a connection error can include the host; never the password.
-  console.error(`Could not run the checks: ${(error as Error).message}`);
+  // Drizzle wraps the driver error; its cause says why (wrong password, unknown host,
+  // certificate). Neither message contains the password or the full URL.
+  const cause = (error as { cause?: { message?: string } }).cause;
+  console.error(`Could not run the checks: ${cause?.message ?? (error as Error).message}`);
   process.exitCode = 1;
 } finally {
   await pool.end();

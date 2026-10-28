@@ -11,7 +11,7 @@ export interface Check {
   detail: string;
 }
 
-const API_ROLES = ["anon", "authenticated"];
+const API_ROLES = ["anon", "authenticated", "service_role"];
 
 /** A text[] literal of bound parameters (drizzle expands a plain array into a list). */
 function textArray(values: string[]) {
@@ -36,6 +36,30 @@ function migrationCount(): number {
   return journal.entries.length;
 }
 
+async function migrationsCheck(db: Db, expected: number): Promise<Check> {
+  try {
+    // Two queries: a missing table is only safe to count once it is known to exist.
+    const { rows } = await db.execute<{ present: boolean }>(
+      sql`SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS present`,
+    );
+    if (rows[0]?.present !== true) {
+      return { name: "migrations", ok: false, detail: `0 of ${expected} applied` };
+    }
+    const { rows: applied } = await db.execute<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`,
+    );
+    const n = applied[0]?.n ?? 0;
+    return { name: "migrations", ok: n === expected, detail: `${n} of ${expected} applied` };
+  } catch {
+    // Typically no access to the drizzle schema: not the user that runs migrations.
+    return {
+      name: "migrations",
+      ok: false,
+      detail: "cannot read the migration history (connect as the user that runs migrations)",
+    };
+  }
+}
+
 /**
  * Read-only checks that a database is safe and ready for Base, on Supabase or plain
  * Postgres. Never reports connection details.
@@ -45,26 +69,22 @@ export async function runDoctor(db: Db): Promise<Check[]> {
   const checks: Check[] = [];
 
   const expected = migrationCount();
-  const { rows: applied } = await db.execute<{ n: number }>(sql`
-    SELECT CASE WHEN to_regclass('drizzle.__drizzle_migrations') IS NULL THEN 0
-      ELSE (SELECT count(*)::int FROM drizzle.__drizzle_migrations) END AS n`);
-  const n = applied[0]?.n ?? 0;
-  checks.push({
-    name: "migrations",
-    ok: n === expected,
-    detail: `${n} of ${expected} applied`,
-  });
+  checks.push(await migrationsCheck(db, expected));
 
+  // withSite() runs `SET LOCAL ROLE cms_app`, which needs the SET option (PostgreSQL 16+)
+  // rather than plain membership.
   const { rows: member } = await db.execute<{ member: boolean }>(sql`
     SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cms_app')
-      AND pg_has_role(current_user, 'cms_app', 'MEMBER') AS member`);
+      AND pg_has_role(current_user, 'cms_app',
+        CASE WHEN current_setting('server_version_num')::int >= 160000 THEN 'SET' ELSE 'MEMBER' END
+      ) AS member`);
   checks.push({
     name: "role",
     ok: member[0]?.member === true,
     detail:
       member[0]?.member === true
-        ? "connecting user is a member of cms_app"
-        : "connecting user is not a member of cms_app (run migrations as this user)",
+        ? "connecting user can switch to cms_app"
+        : "connecting user cannot switch to cms_app (run migrations as this user)",
   });
 
   const { rows: grants } = await db.execute<{ role: string; table: string }>(sql`
@@ -75,15 +95,15 @@ export async function runDoctor(db: Db): Promise<Check[]> {
     WHERE r.rolname = ANY(${textArray(API_ROLES)})
       AND c.relkind = 'r'
       AND c.relname = ANY(${textArray(tables)})
-      AND (has_table_privilege(r.oid, c.oid, 'SELECT') OR has_table_privilege(r.oid, c.oid, 'INSERT')
-        OR has_table_privilege(r.oid, c.oid, 'UPDATE') OR has_table_privilege(r.oid, c.oid, 'DELETE'))
+      AND (has_table_privilege(r.oid, c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+        OR has_any_column_privilege(r.oid, c.oid, 'SELECT,INSERT,UPDATE,REFERENCES'))
     ORDER BY 1, 2`);
   checks.push({
     name: "api roles",
     ok: grants.length === 0,
     detail:
       grants.length === 0
-        ? "anon and authenticated hold no privileges on Base tables"
+        ? "anon, authenticated and service_role hold no privileges on Base tables"
         : `privileges granted: ${grants.map((g) => `${g.role} on ${g.table}`).join(", ")}`,
   });
 

@@ -56,12 +56,22 @@ needs `CLERK_SECRET_KEY`. `AGENTS.md` has the full command list and the project 
 
 ### Supabase
 
-1. In your Supabase project, turn off the Data API (Project settings > Data API), or
-   remove `public` from its exposed schemas. Base also revokes the API roles' access in a
-   migration.
-2. Set `DATABASE_URL` to the **session pooler** URL (Connect > Session pooler, port 5432)
-   with `?sslmode=require`. The transaction pooler (port 6543) is not supported.
-3. Run `pnpm db:migrate`, then `pnpm db:doctor`: every line should read `ok`.
+Give Base its own Supabase project. Base's migrations take away the Data API roles'
+(`anon`, `authenticated`, `service_role`) access to everything in the `public` schema,
+including tables created there later by the same user, so other Data API clients of a
+shared project would stop working.
+
+1. Turn off the Data API (Project settings > Data API), or remove `public` from its
+   exposed schemas.
+2. Download the database's CA certificate (Database settings > SSL configuration) and keep
+   it next to the app, for example `certs/supabase-ca.crt` (it is public, not a secret).
+3. Set `DATABASE_URL` to the **session pooler** URL (Connect > Session pooler, port 5432)
+   plus `?sslmode=verify-full&sslrootcert=certs/supabase-ca.crt`. The `pg` driver treats a
+   bare `sslmode=require` as `verify-full` too, and without the CA certificate the
+   connection can fail certificate checks. The transaction pooler (port 6543) is not
+   supported.
+4. Run `pnpm db:migrate`, then `pnpm db:doctor`: every line should read `ok`. If it cannot
+   connect, it prints the driver's reason (for example a certificate or password error).
 
 ## Planning files
 
