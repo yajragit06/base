@@ -279,8 +279,8 @@ the first 10 production sites.
 
 | Tier | Includes | Proposed price | Ships |
 | --- | --- | --- | --- |
-| **Core** | Content engine, tree, typed fields, versions, drafts, preview, scheduling, admin, APIs, SDK, extensions, CLI, Next.js starter | Free (MIT) | v1 |
-| **AI pack** | Hosted AI credits for assistants, semantic search, MCP agent server, AI budgets and usage dashboard, model routing | ~$19 per site/month incl. credits, then usage-based | v1.1 (v1 AI features run on the site's own keys) |
+| **Core** | Content engine, tree, typed fields, versions, drafts, preview, scheduling, admin, APIs, SDK, extensions, CLI, Next.js starter, MCP agent server | Free (MIT) | v1 |
+| **AI pack** | Hosted AI credits for assistants, semantic search, AI budgets and usage dashboard, model routing | ~$19 per site/month incl. credits, then usage-based | v1.1 (v1 AI features run on the site's own keys) |
 | **Team / Agency** | Multi-site and multi-tenant, approval workflows, SSO, extended audit retention, white-label admin, priority support | ~$99 per organization/month | v1.1 |
 | **Cloud** | Managed Base app, Supabase project, optional worker, backups, one-command deploy | From ~$25/month + usage | v1.1 |
 | **Marketplace** | Paid community extensions | Revenue share (e.g. 20%) | v2 |
@@ -297,6 +297,9 @@ the first 10 production sites.
    bill nothing for AI. From v1.1, production sites can instead buy the AI pack's hosted
    credits; bring-your-own-key stays available.
 5. Plan changes take effect immediately via feature flags.
+
+**Decided 2026-10-28 - MCP stays in the free core.** The MCP agent server, agent tokens
+and publish approvals are core features in every tier; only hosted AI credits are paid.
 
 **Consequence of bring-your-own-key:** v1 earns no AI revenue; paid tiers, license keys
 and hosted credits all start in v1.1 (Features 50 and 60).
