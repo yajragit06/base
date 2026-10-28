@@ -25,7 +25,7 @@ Features 7-10 move what they built onto the new shape; later items were renumber
 ## M1 - Editing core (weeks 4-10) - Gate 1: pilot site modeled and edited in staging
 
 - [x] 6. **Admin shell and tree** - admin app with site switcher and a lazily loaded tree that stays fast at 5,000 nodes [B1, FR-3.1]
-- [ ] 7. **Supabase database** - Base's migrations, row-level security and the `cms_app` role run on Supabase (local `supabase start` and a hosted project) over the session pooler; Supabase's Data API cannot reach Base's tables [NFR Security, rule 14]
+- [x] 7. **Supabase database** - Base's migrations, row-level security and the `cms_app` role run on Supabase (local `supabase start` and a hosted project) over the session pooler; Supabase's Data API cannot reach Base's tables [NFR Security, rule 14]
 - [ ] 8. **One app** - `apps/web` serves the admin at `/admin` and the API as route handlers (`/api/me`, `/api/sites/:siteId/tree`) written once against web-standard `Request`/`Response`, with the same tests; the Fastify server leaves the default deploy and is kept for the Scale pack [FR-4.2, rule 15]
 - [ ] 9. **Supabase Auth** - Supabase Auth (email and password, magic link, verified email only) becomes the default auth adapter; the Clerk adapter stays available; both pass one auth conformance suite and existing users keep their memberships [FR-6.1, rule 15]
 - [ ] 10. **Background jobs** - a job adapter with a Postgres queue as default (deterministic ids, retries); Supabase Cron runs it every minute through a protected route, and the same runner works as a long-running `base worker` [rule 11, rule 15]
