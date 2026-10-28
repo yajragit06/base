@@ -3,7 +3,7 @@
 **From build-plan:** feature 7
 **Build attempt:** 1
 **Branch:** feature/supabase-database
-**Status:** draft
+**Status:** verified
 
 ## Goal
 
@@ -83,7 +83,7 @@ independent review will be selected before `/complete`.
   holds the local Supabase URL (`postgresql://postgres:postgres@127.0.0.1:54322/postgres`)
   and a comment for the hosted session pooler URL; nothing in the repo references Redis
   outside the plans and history.
-- [ ] 4. **CI on the Supabase image.** A second CI job uses `supabase/postgres` (pinned
+- [x] 4. **CI on the Supabase image.** A second CI job uses `supabase/postgres` (pinned
   tag, Postgres 17), connects as its `postgres` user, runs `pnpm db:migrate`, the `@cms/db`
   tests and `pnpm db:doctor`. Check the image's documented environment and whether its
   `postgres` user is a superuser, and print that in the job.

@@ -15,6 +15,9 @@ import { useTestDb } from "./test/db.js";
 
 const { db } = useTestDb();
 
+// Tests that build 5,000+ row fixtures; a cold database can take longer than the 5 s default.
+const HEAVY_FIXTURE_MS = 20_000;
+
 let siteA: Site;
 let siteB: Site;
 
@@ -76,23 +79,31 @@ function inTreeOrder(nodes: TreeNode[]): boolean {
 }
 
 describe("listChildrenPage", () => {
-  it("pages through 5,000 children of one parent exactly once, in order", async () => {
-    const parent = await createEntry(db, siteA.id, { slug: "big", typeKey: "page" });
-    await bulkChildren(siteA.id, parent.id, 5000, "c");
-    const { seen, pages } = await all(siteA.id, parent.id);
-    expect(seen).toHaveLength(5000);
-    expect(new Set(seen.map((n) => n.id)).size).toBe(5000);
-    expect(inTreeOrder(seen)).toBe(true);
-    expect(pages).toBe(50);
-  });
+  it(
+    "pages through 5,000 children of one parent exactly once, in order",
+    async () => {
+      const parent = await createEntry(db, siteA.id, { slug: "big", typeKey: "page" });
+      await bulkChildren(siteA.id, parent.id, 5000, "c");
+      const { seen, pages } = await all(siteA.id, parent.id);
+      expect(seen).toHaveLength(5000);
+      expect(new Set(seen.map((n) => n.id)).size).toBe(5000);
+      expect(inTreeOrder(seen)).toBe(true);
+      expect(pages).toBe(50);
+    },
+    HEAVY_FIXTURE_MS,
+  );
 
-  it("pages through 5,000 top-level entries", async () => {
-    await bulkChildren(siteA.id, null, 5000, "t");
-    const { seen } = await all(siteA.id, null, 200);
-    expect(seen).toHaveLength(5000);
-    expect(new Set(seen.map((n) => n.id)).size).toBe(5000);
-    expect(inTreeOrder(seen)).toBe(true);
-  });
+  it(
+    "pages through 5,000 top-level entries",
+    async () => {
+      await bulkChildren(siteA.id, null, 5000, "t");
+      const { seen } = await all(siteA.id, null, 200);
+      expect(seen).toHaveLength(5000);
+      expect(new Set(seen.map((n) => n.id)).size).toBe(5000);
+      expect(inTreeOrder(seen)).toBe(true);
+    },
+    HEAVY_FIXTURE_MS,
+  );
 
   it("flags nodes that have children", async () => {
     const parent = await createEntry(db, siteA.id, { slug: "about", typeKey: "page" });
@@ -150,48 +161,51 @@ describe("listChildrenPage", () => {
     expect((await listChildrenPage(db, siteA.id, null)).items).toHaveLength(100);
   });
 
-  it("pages a 6,500-node site through indexes only, on cursor pages too", async () => {
-    const big = await createEntry(db, siteA.id, { slug: "big", typeKey: "page" });
-    await bulkChildren(siteA.id, big.id, 5000, "c");
-    await bulkChildren(siteA.id, null, 500, "t");
-    // Many small branches too, so the statistics look like a real site.
-    const { items: branches } = await listChildrenPage(db, siteA.id, null, { limit: 200 });
-    for (const [n, branch] of branches.slice(0, 100).entries()) {
-      await bulkChildren(siteA.id, branch.id, 10, `b${n}-`);
-    }
-    await db.execute(sql`ANALYZE entries`);
-    const first = await listChildrenPage(db, siteA.id, big.id);
-    const topFirst = await listChildrenPage(db, siteA.id, null);
-    const cursorOf = (page: { items: TreeNode[] }) => {
-      const last = page.items.at(-1);
-      if (!last) throw new Error("empty page");
-      return { s: last.sortOrder, i: last.id };
-    };
-    const plans = await withSite(db, siteA.id, async (tx) => {
-      const explain = async (query: Parameters<typeof sql>[1]) => {
-        const { rows } = await tx.execute(sql`EXPLAIN (FORMAT JSON) ${query}`);
-        return JSON.stringify(rows);
+  it(
+    "pages a 6,500-node site through indexes only, on cursor pages too",
+    async () => {
+      const big = await createEntry(db, siteA.id, { slug: "big", typeKey: "page" });
+      await bulkChildren(siteA.id, big.id, 5000, "c");
+      await bulkChildren(siteA.id, null, 500, "t");
+      // Many small branches too, so the statistics look like a real site.
+      const { items: branches } = await listChildrenPage(db, siteA.id, null, { limit: 200 });
+      for (const [n, branch] of branches.slice(0, 100).entries()) {
+        await bulkChildren(siteA.id, branch.id, 10, `b${n}-`);
+      }
+      await db.execute(sql`ANALYZE entries`);
+      const first = await listChildrenPage(db, siteA.id, big.id);
+      const topFirst = await listChildrenPage(db, siteA.id, null);
+      const cursorOf = (page: { items: TreeNode[] }) => {
+        const last = page.items.at(-1);
+        if (!last) throw new Error("empty page");
+        return { s: last.sortOrder, i: last.id };
       };
-      return [
-        await explain(childrenPageQuery(tx, siteA.id, big.id, cursorOf(first), 101)),
-        await explain(childrenPageQuery(tx, siteA.id, null, cursorOf(topFirst), 101)),
-        await explain(
-          parentsAmongQuery(
-            tx,
-            siteA.id,
-            first.items.map((n) => n.id),
+      const plans = await withSite(db, siteA.id, async (tx) => {
+        const explain = async (query: Parameters<typeof sql>[1]) => {
+          const { rows } = await tx.execute(sql`EXPLAIN (FORMAT JSON) ${query}`);
+          return JSON.stringify(rows);
+        };
+        return [
+          await explain(childrenPageQuery(tx, siteA.id, big.id, cursorOf(first), 101)),
+          await explain(childrenPageQuery(tx, siteA.id, null, cursorOf(topFirst), 101)),
+          await explain(
+            parentsAmongQuery(
+              tx,
+              siteA.id,
+              first.items.map((n) => n.id),
+            ),
           ),
-        ),
-        await explain(
-          parentsAmongQuery(
-            tx,
-            siteA.id,
-            topFirst.items.map((n) => n.id),
+          await explain(
+            parentsAmongQuery(
+              tx,
+              siteA.id,
+              topFirst.items.map((n) => n.id),
+            ),
           ),
-        ),
-      ];
-    });
-    for (const plan of plans) expect(plan).not.toContain('"Seq Scan"');
-    // Builds a 6,500-row fixture; a cold database can take longer than the 5 s default.
-  }, 20_000);
+        ];
+      });
+      for (const plan of plans) expect(plan).not.toContain('"Seq Scan"');
+    },
+    HEAVY_FIXTURE_MS,
+  );
 });
