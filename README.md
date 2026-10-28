@@ -41,8 +41,10 @@ build-plan features that need them. Code packages still use the `@cms/*` scope.
 ```bash
 cp .env.example .env
 pnpm install
-pnpm infra:up        # Postgres (pgvector) + Redis in Docker
+pnpm db:start        # local Supabase (needs Docker); or point DATABASE_URL at any Postgres 15+
 pnpm db:migrate      # apply migrations
+pnpm db:doctor       # check the database is ready and closed to Supabase's Data API
+pnpm db:create-test  # create the disposable test database (TEST_DATABASE_URL)
 pnpm dev             # api on :4000 (GET /healthz), admin on :3000
 pnpm verify          # typecheck, lint, test, build (CI runs the same plus migrations)
 pnpm db:generate     # after editing packages/db/src/schema.ts; commit the migration
@@ -51,6 +53,15 @@ pnpm format          # Biome format and safe lint fixes
 
 Database tests need `TEST_DATABASE_URL` exported (a disposable database), and the API
 needs `CLERK_SECRET_KEY`. `AGENTS.md` has the full command list and the project rules.
+
+### Supabase
+
+1. In your Supabase project, turn off the Data API (Project settings > Data API), or
+   remove `public` from its exposed schemas. Base also revokes the API roles' access in a
+   migration.
+2. Set `DATABASE_URL` to the **session pooler** URL (Connect > Session pooler, port 5432)
+   with `?sslmode=require`. The transaction pooler (port 6543) is not supported.
+3. Run `pnpm db:migrate`, then `pnpm db:doctor`: every line should read `ok`.
 
 ## Planning files
 

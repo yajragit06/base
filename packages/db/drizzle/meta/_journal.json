@@ -57,6 +57,13 @@
       "when": 1793112048749,
       "tag": "0007_versions_immutable_and_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793184767680,
+      "tag": "0008_close_tables_to_supabase_api",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type pg from "pg";
 import type { Db } from "./index.js";
 
-const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
+export const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
 
 export function runMigrations(db: Db): Promise<void> {
   return migrate(db, { migrationsFolder });

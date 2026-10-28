@@ -42,7 +42,10 @@ order are in `blueprint/context/project-overview.md`; the full plan is
   (`versions.ts`: one linear chain per entry and locale, the latest is the one nothing is
   based on; a trigger rejects deletes and every change but `status`), `DbError` codes, and
   `withSite()`, which every site-scoped query runs inside: it switches to the `cms_app`
-  role so row-level security applies, even when connected as a superuser.
+  role so row-level security applies, even when connected as a superuser. Every Base table
+  has row-level security, and migration 0008 revokes all privileges of Supabase's Data API
+  roles (`anon`, `authenticated`) on `public` (rule 14). `doctor.ts` holds the read-only
+  `db:doctor` checks.
 - `packages/schema` `defineContentType`, `defineBlock`, the `field` builders, `EntryData`
   and `validateEntry` (field-level errors with stable codes).
 - `packages/core` the write path: `defineCommand` and `runCommand` (Zod input, an
@@ -395,15 +398,23 @@ checks do not make the Blueprint unusable.
 pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
 
 - Install: `pnpm install`
-- Local services: `pnpm infra:up` (Postgres 16 + pgvector, Redis in Docker); `pnpm infra:down`
+- Local database: `pnpm db:start` (local Supabase through the pinned Supabase CLI; needs
+  Docker), `pnpm db:stop`. `supabase/config.toml` keeps `public` out of the Data API. Any
+  Postgres 15+ works through `DATABASE_URL`.
+- Hosted Supabase: `DATABASE_URL` is the session pooler URL (port 5432) with
+  `?sslmode=require`, never the transaction pooler; turn off the Data API (or remove
+  `public` from its exposed schemas) in the dashboard.
+- Database check: `pnpm db:doctor` reports migrations, `cms_app` membership, Data API role
+  privileges and row-level security for `DATABASE_URL`, and exits non-zero on a failure.
 - Dev servers: `pnpm dev` (API http://localhost:4000, `GET /healthz`; admin http://localhost:3000)
 - Build: `pnpm build`
 - Production servers: `pnpm --filter @cms/api start`, `pnpm --filter @cms/admin start`
 - Typecheck: `pnpm typecheck`
 - Lint: `pnpm lint` (Biome); format and safe fixes: `pnpm format`
-- Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db` and `@cms/core` tests need
-  `TEST_DATABASE_URL` exported (a disposable database: tests truncate every table) and
-  a database user allowed to create roles.
+- Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db`, `@cms/core` and `@cms/api`
+  tests need `TEST_DATABASE_URL` exported (a disposable database: tests truncate every
+  table; create it with `pnpm db:create-test`) and a database user allowed to create roles
+  and databases.
 - Database user: the app must connect as the same user that runs `pnpm db:migrate`; the
   migration grants the `cms_app` role (needed by `withSite()` and `withUser()`) only to
   that user.
@@ -419,7 +430,8 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
 
 GitHub checks: `.github/workflows/ci.yml` runs typecheck, lint, migrations on an empty
 database, a schema/migration drift check, tests and build on pull requests and pushes to
-`main`.
+`main`, and a second job that runs the migrations, `db:doctor` and the `@cms/db` tests on
+Supabase's Postgres image.
 
 Browser testing is opt-in. Run `/tests browser` to add a harness and document its exact
 command here as `Browser tests`.

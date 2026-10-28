@@ -19,8 +19,10 @@ app, auth and jobs move in Features 8-10.
   `authenticated`) wherever those roles exist, and turns on row-level security for the
   tables that do not have it yet (`sites`, `domains`, `users`), with policies for
   `cms_app` only, so the app keeps working and a later grant cannot leak data.
-- Local development on the Supabase CLI: `supabase/config.toml` with the Data API (the
-  `api` service) disabled, and root scripts to start and stop it.
+- Local development on the Supabase CLI: `supabase/config.toml` with `public` removed from
+  the Data API's exposed schemas, and root scripts to start and stop it. (Decided during
+  build: disabling the whole `api` service could also take the local gateway that
+  Feature 9's Supabase Auth uses.)
 - A read-only `db:doctor` check that reports, for any `DATABASE_URL`, whether migrations
   are current, the connecting user holds `cms_app`, the API roles have no privileges on
   Base's tables and every Base table has row-level security on.
@@ -39,7 +41,8 @@ app, auth and jobs move in Features 8-10.
 - Moving Base's tables out of the `public` schema.
 - Creating or configuring the user's hosted Supabase project from code; the hosted check
   is `db:doctor`, run by the user (see Testing).
-- Open findings F-10, F-11, F-13, F-14, F-15, F-18, F-24, F-25 and F-26.
+- Open findings F-10, F-11, F-13, F-14, F-18, F-24, F-25 and F-26 (F-15 is fixed here:
+  step 5 rewrites the same `AGENTS.md` test line).
 
 ## Build loop
 
@@ -50,7 +53,7 @@ independent review will be selected before `/complete`.
 
 ## Build steps
 
-- [ ] 1. **Close Base's tables to the Data API.** A custom migration that, when the role
+- [x] 1. **Close Base's tables to the Data API.** A custom migration that, when the role
   exists, revokes all privileges on every table, sequence and function in `public` from
   `anon` and `authenticated`, revokes the matching default privileges of the migrating
   user, and enables row-level security on `sites`, `domains` and `users` with policies
@@ -62,7 +65,7 @@ independent review will be selected before `/complete`.
   role granted `SELECT` later still reads no rows of a row-level-secured table; tests also
   prove `cms_app` sees only its own site's `sites` and `domains` rows inside `withSite`
   and its member sites inside `withUser`; no migration drift.
-- [ ] 2. **`db:doctor`.** `pnpm db:doctor` (in `@cms/db`, reads `DATABASE_URL`) runs
+- [x] 2. **`db:doctor`.** `pnpm db:doctor` (in `@cms/db`, reads `DATABASE_URL`) runs
   read-only checks and prints one line per check with pass or fail, exiting non-zero on
   any failure: pending migrations; the user is a member of `cms_app`; `anon` and
   `authenticated` (when present) hold no privilege on any Base table; every Base table has
@@ -70,9 +73,9 @@ independent review will be selected before `/complete`.
   **Done when:** tests run the checks against the test database (all pass) and against a
   database with a deliberately granted privilege or disabled row-level security (the
   matching check fails); a manual run prints no secret.
-- [ ] 3. **Supabase CLI for local development.** Pin the `supabase` CLI as a root dev
-  dependency; add `supabase/config.toml` (from `supabase init`, with `[api] enabled =
-  false` and the project id `base`); root scripts `db:start` and `db:stop`; remove Redis
+- [x] 3. **Supabase CLI for local development.** Pin the `supabase` CLI as a root dev
+  dependency; add `supabase/config.toml` (from `supabase init`, with `public` left out of
+  `[api] schemas`, seeding off, and the project id `base`); root scripts `db:start` and `db:stop`; remove Redis
   and the Postgres service from docker compose, the `infra:*` scripts, `REDIS_URL` from
   `.env.example` and CI. The local test database is created by a seed or a documented
   `createdb` step. Check the CLI's current `config.toml` keys before writing it.
@@ -86,7 +89,7 @@ independent review will be selected before `/complete`.
   `postgres` user is a superuser, and print that in the job.
   **Done when:** the workflow is valid YAML that `pnpm lint` accepts, the job's commands
   run locally against plain Postgres, and the job passes on the pull request.
-- [ ] 5. **Docs and final gate.** `AGENTS.md` Commands and Layout, README commands and a
+- [x] 5. **Docs and final gate.** `AGENTS.md` Commands and Layout, README commands and a
   short "Supabase" section (session pooler URL with `sslmode=require`, turn off the Data
   API in the dashboard, run `pnpm db:migrate` then `pnpm db:doctor`).
   **Done when:** `pnpm verify` passes and there is no migration drift.
@@ -119,7 +122,8 @@ independent review will be selected before `/complete`.
     member sites (an `EXISTS` on `memberships`, itself row-level secured); no insert,
     update or delete for `cms_app` beyond what `withSite` already needs (`SELECT ... FOR
     NO KEY UPDATE` locks only).
-  - `domains`: `site_id = app.site_id`, select only.
+  - `domains`: `site_id = app.site_id` for every command (`site.addDomain` inserts its
+    domain inside `withSite`, so select-only would break it; decided during build).
   - `users`: select only, `id = app.user_id`, or a member of `app.site_id`.
 - Existing policies on `entries`, `versions`, `audit_log` and `memberships` are unchanged.
 

@@ -25,16 +25,9 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U cms -d cms"
           --health-interval 5s --health-timeout 3s --health-retries 20
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s --health-timeout 3s --health-retries 20
     env:
       DATABASE_URL: postgres://cms:cms@localhost:5432/cms
       TEST_DATABASE_URL: postgres://cms:cms@localhost:5432/cms
-      REDIS_URL: redis://localhost:6379
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
@@ -57,3 +50,37 @@ jobs:
           fi
       - run: pnpm test
       - run: pnpm build
+
+  supabase:
+    # Base's migrations, database tests and db:doctor on Supabase's own Postgres image,
+    # which ships the anon and authenticated roles and Supabase's default grants.
+    name: Migrate and test on Supabase Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: supabase/postgres:17.11.0.008
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -h localhost"
+          --health-interval 5s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/base_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Show the connecting user's attributes
+        run: psql "$DATABASE_URL" -c "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolbypassrls FROM pg_roles WHERE rolname = current_user"
+      - run: pnpm db:migrate
+      # Fails if the anon or authenticated roles can reach a Base table, or RLS is off.
+      - run: pnpm db:doctor
+      - run: pnpm db:create-test
+      - run: pnpm turbo run test --filter=@cms/db

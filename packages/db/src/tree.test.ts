@@ -192,5 +192,6 @@ describe("listChildrenPage", () => {
       ];
     });
     for (const plan of plans) expect(plan).not.toContain('"Seq Scan"');
-  });
+    // Builds a 6,500-row fixture; a cold database can take longer than the 5 s default.
+  }, 20_000);
 });

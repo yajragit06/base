@@ -13,13 +13,16 @@
     "format": "biome check --write .",
     "test": "turbo test --concurrency=1",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
-    "infra:up": "docker compose up -d postgres redis",
-    "infra:down": "docker compose down",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
     "db:generate": "pnpm --filter @cms/db generate",
-    "db:migrate": "turbo run migrate --filter=@cms/db"
+    "db:migrate": "turbo run migrate --filter=@cms/db",
+    "db:doctor": "pnpm --filter @cms/db run doctor",
+    "db:create-test": "pnpm --filter @cms/db run create-test-db"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.3",
+    "supabase": "2.122.0",
     "turbo": "^2.11.10",
     "typescript": "^5.9.3"
   }
