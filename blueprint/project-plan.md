@@ -299,7 +299,7 @@ the first 10 production sites.
 5. Plan changes take effect immediately via feature flags.
 
 **Consequence of bring-your-own-key:** v1 earns no AI revenue; paid tiers, license keys
-and hosted credits all start in v1.1 (Features 44 and 54).
+and hosted credits all start in v1.1 (Features 50 and 60).
 
 **Conflict to resolve (see section 13):** "multi-site" is both a free v1 P0 (D3) and a
 Team/Agency feature.
