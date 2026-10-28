@@ -54,3 +54,49 @@
 **Why it matters:** The spec says the version stores data "exactly as validated", and its notes say "Use `structuredClone`d validated data from `validateEntry`, never the raw input". The first save test passes `{ title: " Hello " }` but never asserts `v1.data`. `v2.data` is checked only with input that validation leaves unchanged. The test content type has no defaulted or transformed field, so a regression that wrote `input.data` instead of `validated.data` (packages/core/src/commands/versions.ts:104) would pass every test. This is not a live defect: the handler uses `validated.data` today.
 **Suggested fix:** Give the test content type a field with a default (or another value that validation changes), save without that field, and assert the stored `data` holds the validated output. Test-only change; no current requirement is lost.
 **Resolution:**
+
+### F-24 [P3] open - Top-level tree pages cannot use index order and read every remaining top-level row
+
+**File:** packages/db/src/entries.ts:233
+**Found:** 2026-10-27 by /audit independent (scope: current; lens: performance, tests)
+**Why it matters:**
+- `entries_site_parent_idx` is `(site_id, parent_id, sort_order)`, without `id`. For the top level the filter is `parent_id IS NULL`, which PostgreSQL does not treat as an equality that fixes the index prefix. So `ORDER BY sort_order, id LIMIT n` is never produced by the index there: every top-level page reads all remaining top-level rows and top-N sorts them.
+- EXPLAIN ANALYZE as `cms_app`, in rolled-back transactions:
+  - A site whose 5,000 pages are all top level (the step 1 test shape) uses a Seq Scan on entries for both the first page and a cursor page (about 2 ms).
+  - A flat site with 50,000 top-level pages uses a parallel Seq Scan for the first page (19 ms), and a cursor at 40,000 reads 10,001 rows (3.7 ms).
+  - Adding `id` to the existing index does not change this.
+  - Under a parent, ties on `sort_order` force the sort to cover every tied sibling (5,000 siblings with sort order 0: 2.3 ms per page).
+- Speed meets the 5,000-node target today, so this is not a live defect.
+- The plan test passes only because its top level is 8% of the site, and the code comment ("keeps keyset paging on the ... index") overstates the guarantee.
+
+**Suggested fix:**
+- In a forward migration, add a partial index `(site_id, sort_order, id) WHERE parent_id IS NULL`. A probe gave Index Only Scan at 0.07 ms on both the first and cursor pages of the flat 5,000-page site.
+- Optionally add `id` to `entries_site_parent_idx`, so that ties under a parent are index-ordered.
+- Add a flat 5,000-top-level shape to the plan test.
+- Alternatively, accept this at the current scale and correct the code comment. No current requirement is lost.
+
+**Resolution:**
+
+### F-25 [P2] open - A rejected tree load leaves the list "Loading…" forever with no Retry
+
+**File:** apps/admin/components/tree/page-tree.tsx:56
+**Found:** 2026-10-28 by /audit independent (scope: current; lens: quality, tests)
+**Why it matters:**
+- `load` awaits `loadChildren` without a `try`/`catch`, and the effect calls it as `void load(...)` (page-tree.tsx:71).
+- `loadChildren` (app/sites/[siteId]/actions.ts:22) rethrows every error that is not an `ApiError`. That includes a `fetch` failure when the API is unreachable, and a token or JSON failure.
+- When the browser cannot reach the server action, the call also rejects. The installed Next docs (01-app/02-guides/offline-support.md:314) say "a Server Action called with no network throws a fetch error and the awaited promise rejects".
+- In each case `loadError` is never dispatched, and the list keeps `status: "loading"` for good. An expanded node shows a spinner that never ends, and a "Show more" or "Retry" row stays "Loading…" with no way to retry short of a page reload.
+- Because step 7 makes `onKey` ignore keys while focus rests on a loading row, arrow keys, Enter and Space then do nothing there. Tab and the mouse still work.
+- The spec's tree states promise an error state with Retry for each node. The unreachable-API case is exactly the outage F-22 handles for server renders.
+- No test covers a rejected load, because the component has no tests.
+
+**Suggested fix:** Wrap the `await loadChildren(...)` in `load` in `try`/`catch` and dispatch `loadError` (and the announcement) on any rejection. Optionally, have `loadChildren` return `{ ok: false }` for non-`ApiError` failures as well. No current requirement is lost.
+**Resolution:**
+
+### F-26 [P3] open - A repeated tree load failure is not announced again
+
+**File:** apps/admin/components/tree/page-tree.tsx:64
+**Found:** 2026-10-28 by /audit independent (scope: current; lens: quality)
+**Why it matters:** Every failed load sets the same `announcement` string. After the first failure the state does not change, so React leaves the `aria-live` text untouched, and screen readers announce nothing when a Retry fails again. Focus stays on the same Retry row, so nothing else signals the second failure either. The spec says the error state is "announced through an aria-live region".
+**Suggested fix:** Clear the announcement when a load starts, or vary the text (for example include the attempt count), so each failure changes the live region. No current requirement is lost.
+**Resolution:**
