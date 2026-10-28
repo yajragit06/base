@@ -3,6 +3,7 @@ import pg from "pg";
 import * as schema from "./schema.js";
 
 export { insertAudit, type NewAuditEntry } from "./audit.js";
+export { type Check, formatChecks, runDoctor } from "./doctor.js";
 export {
   createEntry,
   createEntryInTx,

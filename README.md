@@ -41,8 +41,10 @@ build-plan features that need them. Code packages still use the `@cms/*` scope.
 ```bash
 cp .env.example .env
 pnpm install
-pnpm infra:up        # Postgres (pgvector) + Redis in Docker
+pnpm db:start        # local Supabase (needs Docker); or point DATABASE_URL at any Postgres 15+
 pnpm db:migrate      # apply migrations
+pnpm db:doctor       # check the database is ready and closed to Supabase's Data API
+pnpm db:create-test  # create the disposable test database (TEST_DATABASE_URL)
 pnpm dev             # api on :4000 (GET /healthz), admin on :3000
 pnpm verify          # typecheck, lint, test, build (CI runs the same plus migrations)
 pnpm db:generate     # after editing packages/db/src/schema.ts; commit the migration
@@ -51,6 +53,25 @@ pnpm format          # Biome format and safe lint fixes
 
 Database tests need `TEST_DATABASE_URL` exported (a disposable database), and the API
 needs `CLERK_SECRET_KEY`. `AGENTS.md` has the full command list and the project rules.
+
+### Supabase
+
+Give Base its own Supabase project. Base's migrations take away the Data API roles'
+(`anon`, `authenticated`, `service_role`) access to everything in the `public` schema,
+including tables created there later by the same user, so other Data API clients of a
+shared project would stop working.
+
+1. Turn off the Data API (Project settings > Data API), or remove `public` from its
+   exposed schemas.
+2. Download the database's CA certificate (Database settings > SSL configuration) and keep
+   it next to the app, for example `certs/supabase-ca.crt` (it is public, not a secret).
+3. Set `DATABASE_URL` to the **session pooler** URL (Connect > Session pooler, port 5432)
+   plus `?sslmode=verify-full&sslrootcert=certs/supabase-ca.crt`. The `pg` driver treats a
+   bare `sslmode=require` as `verify-full` too, and without the CA certificate the
+   connection can fail certificate checks. The transaction pooler (port 6543) is not
+   supported.
+4. Run `pnpm db:migrate`, then `pnpm db:doctor`: every line should read `ok`. If it cannot
+   connect, it prints the driver's reason (for example a certificate or password error).
 
 ## Planning files
 
