@@ -7,6 +7,13 @@
 > and costs also live in a separate architecture doc (not part of this blueprint);
 > where it disagrees with this plan, update this plan and re-run `/overview`.
 >
+> **Restructured 2026-10-28** (decided with the user): one Next.js app holds the admin, the
+> API and the website, on one Supabase project (Postgres, Auth, Storage). Power users can
+> later switch on the **Scale pack** (a standalone API server, Redis job workers, Clerk,
+> S3/R2 storage, on Railway) without changing their site, because the core reaches every
+> service through an adapter. Features 1-6 were built on the earlier Fastify + Clerk
+> shape and are migrated by Features 7-10.
+>
 > The product is named **Base** (tagline: "The tree-first CMS for developers, editors and
 > AI agents."): npm scope `@base/*`, CLI `base`, scaffolder `create-base-app`. The code
 > packages built so far still use the placeholder scope `@cms/*`.
@@ -109,14 +116,14 @@ and tickets can reference them.
 - Trash with 30-day soft delete and restore [FR-1.6]
 
 **Rendering and extensions (developer)**
-- `create-base-app` scaffolds a Next.js site wired to the API with sample types [C1]
+- `create-base-app` scaffolds the Base app (website, admin and API in one Next.js app) wired to a Supabase project, with sample types [C1]
 - Registry mapping content type to layout and block to component; unknown blocks fail loudly in dev [C2]
-- Typed hooks, sync (2 s timeout, can cancel) or async on BullMQ with retries [C3]
+- Typed hooks, sync (2 s timeout, can cancel) or async on the Postgres job queue with retries [C3]
 - `defineExtension()` packaging, installed via npm + CLI [C4]
 - Sitemap, robots.txt, structured data, per-page Markdown and `llms.txt` [FR-7.3, AI-6]
 
 **Admin and access (site admin)**
-- Invite users by email (Resend) and assign roles [D1]
+- Invite users by email (Supabase Auth invitations) and assign roles [D1]
 - Subtree policies enforced in the core [D2]
 - Multiple sites per install with their own domains, locales, settings and content [D3]
 - Audit log filterable by user, agent, action and date [D4]
@@ -134,6 +141,12 @@ and tickets can reference them.
 - MCP server mirroring Admin API commands; publish needs human approval by default [F4, AI-5]
 - Per-site monthly AI budget, usage dashboard, alert at 80% and hard stop at 100% [F5, G-4; P0, promoted from P1]
 
+**Scale-up path (power users)**
+- The core reaches auth, storage, jobs and the API host through adapters, each with a
+  conformance test suite; one config switch selects them [Scale]
+- The Scale pack (after v1 GA): a standalone API server, Redis job workers, a Clerk auth
+  adapter and an S3/R2 storage adapter, deployable on Railway [Scale]
+
 **Non-goals for v1**
 
 - Drag-and-drop visual page builder (v2, H3)
@@ -145,7 +158,7 @@ and tickets can reference them.
 
 **v1.1 (about 8 weeks after v1 GA):** one-command cloud deploy [G1], multi-tenant
 isolation with per-tenant domains and quotas [G2], checkout, plans and license keys
-[G3], approval workflows [G4], SSO via Clerk [G5, P1], Expo starter with push [G6, P1],
+[G3], approval workflows [G4], SSO via Supabase Auth (SAML) [G5, P1], Expo starter with push [G6, P1],
 RAG chat over site content [G7, P1], content relations UI and bulk edit, custom admin
 pages from extensions, blog and docs starters, extension registry, and hosted AI
 credits (the paid AI pack) through a metered AI gateway.
@@ -175,7 +188,7 @@ schema at the version it was written with.
 - **Redirects:** old URI to new URI (301), created automatically on move or slug change.
 - **Media:** object-storage key, filename, MIME type, size, dimensions, focal point,
   per-locale alt text, plus derived variants (sizes and crops).
-- **Users, memberships and roles:** Clerk user id, email, per-site role.
+- **Users, memberships and roles:** Supabase Auth user id, email, per-site role.
 - **Policies:** subtree grants and denies per user (or token) on a tree node.
 - **Invitations:** email, role, site, token hash, expiry.
 - **API tokens:** hashed secret, prefix, site, scopes (read/write, subtree, command list),
@@ -185,6 +198,9 @@ schema at the version it was written with.
   row per attempt with status, response code and next retry.
 - **Audit log:** append-only; actor type and id, action, target, before/after diff, and
   for AI writes the model, prompt template id, token counts.
+- **Jobs:** a Postgres job queue (deterministic id, type, payload, run-at, attempts, last
+  error, status) shared by scheduled publishing, async hooks, webhooks, embeddings, image
+  variants and purges.
 - **AI:** embedding chunks (pgvector) per published version and locale; AI usage events;
   monthly budget per site; publish requests created by agents awaiting approval.
 - **Licenses (v1.1):** license key, production domains, plan, status (see section 6).
@@ -194,41 +210,65 @@ schema at the version it was written with.
 
 ## 5. Tech - What stack are we using?
 
-From the PRD and its requirements. Items marked **TODO** must be settled in the
-architecture doc before Feature 1.
+**Shape (decided 2026-10-28):** one Next.js app plus one Supabase project runs a whole
+site. The app serves the public website at `/`, the admin at `/admin` and the APIs at
+`/api`. Developers build their site inside this app (layouts, blocks, loaders), so there is
+nothing else to deploy.
+
+**Adapters (the scale seams):** the core never calls a provider directly. Four adapters,
+chosen in one config file and each proven by a shared conformance test suite:
+
+| Adapter | Default (Supabase stack) | Scale pack (power users) |
+| --- | --- | --- |
+| Auth | Supabase Auth | Clerk |
+| Storage | Supabase Storage | S3-compatible (Cloudflare R2, AWS S3) |
+| Jobs | Postgres queue run by Supabase Cron | BullMQ on Redis with long-running workers |
+| API host | Next.js route handlers in the app | Standalone Fastify server serving the same handlers |
+
+The database stays Postgres through Drizzle either way (Supabase, Railway or any Postgres
+16+). Switching a site to the Scale pack changes configuration and deployment, not the
+site's code.
 
 - **Language:** TypeScript (strict) everywhere; ESM; Node.js LTS.
-- **Monorepo:** pnpm workspaces + Turborepo (scaffolded; Biome for lint and format,
-  Vitest for tests, `pnpm verify` as the umbrella check). Planned packages: `core` (content
-  engine, commands, permissions), `schema` (`defineContentType`, field types, codegen),
-  `api` (Delivery + Admin), `admin` (Next.js admin app), `worker` (BullMQ), `sdk`
-  (generated client), `cli`, `mcp`, `create-base-app`, `starter-next`, and paid
-  `@base/ee-*` packages kept separate (see section 6).
-- **API server:** Fastify (decided). Must expose Delivery and Admin APIs and run on
-  Railway or any Docker host.
-- **Database:** PostgreSQL 16+ with JSONB, `ltree` or materialized paths for the tree,
-  pgvector for embeddings, row-level security for site isolation.
-- **ORM / migrations:** Drizzle with `pg` (decided), migrations generated by drizzle-kit.
-  Framework migrations are forward-only and must work with the previous release's code.
+- **Monorepo:** pnpm workspaces + Turborepo (Biome, Vitest, `pnpm verify`). Packages:
+  `schema` (`defineContentType`, field types, codegen), `db` (Drizzle schema, migrations,
+  queries), `core` (content engine, commands, permissions, jobs), `web` (the Next.js app:
+  site, admin and API), `sdk` (generated client), `cli`, `create-base-app`, and paid
+  `@base/ee-*` packages kept separate (see section 6). The MCP server is a route in `web`.
+- **App:** Next.js (App Router) + React. Route handlers serve the Admin API, the Delivery
+  API, jobs and MCP; server components read content through `core`, not over HTTP. API
+  handlers are written once against web-standard `Request`/`Response`, so the Scale pack's
+  Fastify server can serve the same ones (Feature 8 moves the current Fastify routes there).
+- **Database:** Supabase Postgres (15+) with JSONB, materialized paths for the tree,
+  pgvector for embeddings, and row-level security for site isolation (the `cms_app` role
+  and `withSite()`). Base connects with Drizzle over the session pooler; Supabase's
+  auto-generated Data API must not expose Base's tables.
+- **ORM / migrations:** Drizzle with `pg` (decided), migrations generated by drizzle-kit,
+  forward-only and compatible with the previous release's code.
 - **Validation:** Zod for fields, commands, API input and AI structured output.
-- **Queue / cache:** Redis + BullMQ for scheduled publish, async hooks, webhooks,
-  embeddings, image variants and cache purges.
-- **Admin app:** Next.js (App Router) + React; shadcn/ui components with Tailwind CSS
-  (decided before Feature 6); rich text editor **TODO** (Tiptap or Lexical) storing
-  structured JSON.
-- **Site starter:** Next.js with cache tags and on-demand revalidation.
-- **Auth:** Clerk for people (behind an auth adapter so self-hosters can swap in
-  Auth.js/Lucia); hashed scoped tokens for apps and agents.
-- **Media storage:** Cloudflare R2 via an S3-compatible storage adapter (local disk adapter
-  for development). **Assumption:** image resizing with `sharp` in the worker.
-- **Email:** Resend (invites, alerts).
+- **Auth:** Supabase Auth for people (email and password, magic links, invitations), behind
+  the auth adapter; hashed scoped tokens for apps and agents. Supabase Auth becomes the
+  default in Feature 9; the Clerk adapter built in Feature 4 is kept for the Scale pack.
+- **Media storage:** Supabase Storage behind the storage adapter (local disk adapter for
+  development; S3/R2 adapter in the Scale pack). **Assumption:** image variants with `sharp` in a job.
+- **Jobs:** a Postgres job queue in `core` (deterministic ids, retries with backoff).
+  Supabase Cron (`pg_cron` + `pg_net`) calls a protected `/api/jobs/run` every minute; the
+  same runner can also run as a long-lived worker (`base worker`). The Scale pack swaps in
+  BullMQ on Redis behind the same job adapter.
+- **Caching:** Next.js cache tags; publishing revalidates the affected tags in the same app.
+- **Admin UI:** shadcn/ui components with Tailwind CSS (decided before Feature 6); rich
+  text editor **TODO** (Tiptap or Lexical) storing structured JSON.
+- **Email:** Supabase Auth's mailer for sign-in and invitations (custom SMTP in
+  production); Resend optional for other notices.
 - **AI:** Claude Sonnet 5.5 for drafts, rewrites and translation; Claude Haiku 5.5 for
   alt text, summaries, tagging and SEO meta; Voyage AI for embeddings. All behind a
   provider adapter; a site can switch or disable AI.
-- **Agents:** Model Context Protocol server exposing Admin API commands as tools.
-- **Observability:** Sentry, structured JSON logs, BullMQ dashboard.
-- **Testing:** unit tests on core (80%+ coverage), integration tests against real Postgres,
-  Playwright E2E for every P0 story, Lighthouse CI on the starter.
+- **Agents:** Model Context Protocol server (a route in the app) exposing Admin API
+  commands as tools.
+- **Observability:** Sentry, structured JSON logs, a jobs screen in the admin.
+- **Testing:** unit tests on core (80%+ coverage), integration tests against real Postgres
+  (local Supabase or plain Postgres 16), Playwright E2E for every P0 story, Lighthouse CI
+  on the site.
 - **Billing (v1.1):** Lemon Squeezy or Stripe (**TODO**), feature flags per plan.
 
 ## 6. Monetize - How will this make money?
@@ -239,10 +279,10 @@ the first 10 production sites.
 
 | Tier | Includes | Proposed price | Ships |
 | --- | --- | --- | --- |
-| **Core** | Content engine, tree, typed fields, versions, drafts, preview, scheduling, admin, APIs, SDK, extensions, CLI, Next.js starter | Free (MIT) | v1 |
-| **AI pack** | Hosted AI credits for assistants, semantic search, MCP agent server, AI budgets and usage dashboard, model routing | ~$19 per site/month incl. credits, then usage-based | v1.1 (v1 AI features run on the site's own keys) |
+| **Core** | Content engine, tree, typed fields, versions, drafts, preview, scheduling, admin, APIs, SDK, extensions, CLI, Next.js starter, MCP agent server | Free (MIT) | v1 |
+| **AI pack** | Hosted AI credits for assistants, semantic search, AI budgets and usage dashboard, model routing | ~$19 per site/month incl. credits, then usage-based | v1.1 (v1 AI features run on the site's own keys) |
 | **Team / Agency** | Multi-site and multi-tenant, approval workflows, SSO, extended audit retention, white-label admin, priority support | ~$99 per organization/month | v1.1 |
-| **Cloud** | Managed API, workers, Postgres, Redis, storage, backups, one-command deploy | From ~$25/month + usage | v1.1 |
+| **Cloud** | Managed Base app, Supabase project, optional worker, backups, one-command deploy | From ~$25/month + usage | v1.1 |
 | **Marketplace** | Paid community extensions | Revenue share (e.g. 20%) | v2 |
 
 **Packaging rules**
@@ -258,8 +298,11 @@ the first 10 production sites.
    credits; bring-your-own-key stays available.
 5. Plan changes take effect immediately via feature flags.
 
+**Decided 2026-10-28 - MCP stays in the free core.** The MCP agent server, agent tokens
+and publish approvals are core features in every tier; only hosted AI credits are paid.
+
 **Consequence of bring-your-own-key:** v1 earns no AI revenue; paid tiers, license keys
-and hosted credits all start in v1.1 (Features 44 and 54).
+and hosted credits all start in v1.1 (Features 50 and 60).
 
 **Conflict to resolve (see section 13):** "multi-site" is both a free v1 P0 (D3) and a
 Team/Agency feature.
@@ -285,14 +328,17 @@ Responsive down to tablet width; WCAG 2.1 AA.
 - **Pending approvals:** agent publish requests appear as a queue with diff, approve,
   reject.
 
-**Main admin routes** (**Assumption**)
+**Main admin routes** (under `/admin`, with the site in the URL as built in Feature 6)
 
-- `/` - tree + dashboard (recent edits, scheduled, pending approvals)
-- `/entries/:id` - entry editor; `/entries/:id/versions` - history
-- `/media` - media library
-- `/settings/{users,roles,sites,locales,tokens,webhooks,ai,audit}`
+- `/admin` - sends a person to their first site
+- `/admin/sites/:siteId` - tree + dashboard (recent edits, scheduled, pending approvals)
+- `/admin/sites/:siteId/entries/:id` - entry editor; `.../versions` - history
+- `/admin/sites/:siteId/media` - media library
+- `/admin/sites/:siteId/settings/{users,roles,locales,tokens,webhooks,ai,audit}`
 
-**Site starter:** a clean, accessible Next.js site (Lighthouse ≥ 90, WCAG 2.1 AA) that
+**Website:** every other path is the public site, rendered by the same app from the tree:
+host resolves to site, path resolves to entry. `create-base-app` ships a clean, accessible
+default site (Lighthouse ≥ 90, WCAG 2.1 AA) that
 shows layouts, blocks, loaders, navigation from the tree, preview mode and SEO outputs.
 Developers own every element of markup.
 
@@ -301,42 +347,63 @@ help (usability test with 3 editors).
 
 ## 8. Deployment - Where and how will this ship?
 
-**Reference deployment (v1):**
+**Default deployment (v1): two services.**
 
 | Piece | Host | Notes |
 | --- | --- | --- |
-| Admin app (Next.js) | Vercel | Or self-hosted on Railway |
-| Site (Next.js starter) | Vercel | One project per client site; host resolves to site |
-| API (Delivery + Admin + MCP over HTTP) | Railway | Docker image; health check `GET /healthz` (**Assumption**) |
-| Worker (BullMQ) | Railway | Same image, different start command |
-| Postgres 16 + pgvector | Railway | Daily backups, 30-day retention, monthly restore test |
-| Redis | Railway | Queues and cache |
-| Media | Cloudflare R2 | Public bucket or CDN in front |
+| Base app: website, admin, Admin + Delivery APIs, MCP, job endpoint | Vercel | Or any Node host; one project per install, every site's domains point at it |
+| Postgres 16+ with pgvector and RLS | Supabase | Session-pooler connection; Data API closed to Base tables; Supabase backups |
+| Auth (people) | Supabase Auth | Custom SMTP in production |
+| Media | Supabase Storage | Public bucket behind the CDN; signed uploads |
+| Scheduled jobs | Supabase Cron | Calls `/api/jobs/run` every minute with `JOBS_SECRET` |
 
-**Distribution:** npm packages under `@base/*`; `create-base-app` scaffolder; a
-Docker image for API + worker; `docker compose` for local Postgres + Redis.
+**Scale-up deployment (power users, Scale pack, after v1 GA):** for sites that outgrow
+the default, the same app switches adapters by configuration and adds services on
+Railway:
 
-**Env vars (by name, Assumption):** `DATABASE_URL`, `REDIS_URL`, `CLERK_SECRET_KEY`,
-`CLERK_PUBLISHABLE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
-`R2_BUCKET`, `MEDIA_PUBLIC_URL`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY` and `VOYAGE_API_KEY`
-(optional install-wide defaults for local development; production sites use their own
-keys set in the admin),
-`SECRETS_KEY` (seals webhook secrets), `PREVIEW_SECRET`, `REVALIDATE_SECRET`,
-`SENTRY_DSN`, `TELEMETRY` (opt-in). `LICENSE_KEY` arrives in v1.1.
+| Piece | Host | Replaces |
+| --- | --- | --- |
+| Standalone API server (Fastify, same handlers) | Railway | API route handlers on Vercel |
+| Job workers (BullMQ) + Redis | Railway | Supabase Cron + Postgres queue |
+| Auth | Clerk | Supabase Auth |
+| Media | Cloudflare R2 or AWS S3 | Supabase Storage |
+| Postgres | Supabase (kept) or Railway | - |
+| The Base app (website + admin) | Vercel, or Railway via the Docker image | - |
+
+A smaller step needs no Scale pack: the default job runner also runs as a long-lived
+`base worker` on Railway, with Supabase Cron as a backstop.
+
+**Distribution:** npm packages under `@base/*` (the Scale pack's adapters and server as
+separate `@base/scale-*` packages); `create-base-app` scaffolder; an optional Docker image
+for Railway or any Docker host; the Supabase CLI (`supabase start`) for local
+development.
+
+**Env vars (by name, Assumption):** `DATABASE_URL` (Supabase session pooler),
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Auth only),
+`SUPABASE_SERVICE_ROLE_KEY` (server only: Storage, Auth admin), `STORAGE_BUCKET`,
+`JOBS_SECRET`, `SECRETS_KEY` (seals keys and webhook secrets), `PREVIEW_SECRET`,
+`ANTHROPIC_API_KEY` and `VOYAGE_API_KEY` (optional install-wide defaults for local
+development; production sites use their own keys set in the admin), `RESEND_API_KEY`
+(optional), `SENTRY_DSN`, `TELEMETRY` (opt-in). `LICENSE_KEY` arrives in v1.1. The
+Scale pack adds `REDIS_URL`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`,
+`S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`,
+`MEDIA_PUBLIC_URL` and `API_URL` (where the standalone server runs).
 
 **Jobs:** scheduled publish/unpublish (minute accuracy), async hooks, webhook delivery
-(exponential backoff for 24 h), embeddings, image variants, cache purge, trash purge
-(30 days), AI budget alerts.
+(exponential backoff for 24 h), embeddings, image variants, cache revalidation, trash
+purge (30 days), AI budget alerts.
 
-**Environments:** local (Docker), staging, production. Staging and `localhost` never need
-a license key (v1.1).
+**Environments:** local (Supabase CLI), staging, production. Staging and `localhost`
+never need a license key (v1.1).
 
 ## 9. Usage model and constraints
 
 - **Scale at launch:** agency client sites. Up to 50,000 entries per site without query
   degradation; 25 concurrent editors per site; several sites per install.
-- **Reachability:** Delivery API and sites are internet-facing; admin and Admin API are
-  internet-facing behind Clerk; MCP is reachable only with an agent token.
+- **Reachability:** the website and Delivery API are internet-facing; the admin and Admin
+  API are internet-facing behind Supabase Auth; MCP is reachable only with an agent token;
+  `/api/jobs/run` only with `JOBS_SECRET`; Base's tables are never exposed through
+  Supabase's Data API.
 - **Trust:** editors and admins are trusted within their role; agents are *not* trusted
   beyond their token scope; delivery API callers are anonymous unless they hold a token.
 - **Tenancy:** v1 is multi-site within one organization (site id on every row, RLS).
@@ -353,7 +420,7 @@ a license key (v1.1).
 | Publish to live | ≤ 10 s including cache purge |
 | Delivery API uptime | 99.9% monthly |
 | Backups / recovery | Daily, 30-day retention, monthly restore test; RPO ≤ 24 h, RTO ≤ 4 h |
-| Security | Clerk sessions; hashed tokens; secrets only in env vars; OWASP Top 10; rate limits on all public endpoints |
+| Security | Supabase Auth sessions; hashed tokens; secrets only in env vars; OWASP Top 10; rate limits on all public endpoints |
 | Privacy | Audit-logged access to personal data; delete-user flow; Brunei PDPO compatibility **TODO** (confirm with counsel) |
 | Accessibility | Admin and starter WCAG 2.1 AA; starter Lighthouse ≥ 90 |
 | Quality | ≥ 80% coverage on core; E2E for all P0 stories; 0 data-loss incidents |
@@ -388,9 +455,15 @@ during `/onboard` once the code exists.
 10. **Schema changes that affect data** need a version bump and a migration function, with a
     dry-run count before apply.
 11. **Jobs are idempotent** with deterministic job ids; webhooks are signed (HMAC) and retried.
+    Jobs live in Postgres and must work from both Supabase Cron and the optional worker.
 12. **Secrets:** tokens and preview links stored hashed; webhook secrets sealed; nothing
     secret returned by the API or written to the audit log.
 13. **Core never depends on `@base/ee-*`.**
+14. **Base's tables are reachable only through Base.** Supabase's Data API never exposes
+    them, and the service-role key never reaches the browser.
+15. **Providers only behind adapters.** Core and app code reach auth, storage, jobs and
+    the API host only through their adapters, and every adapter passes the shared
+    conformance suite, so the Scale pack can replace any of them.
 
 ## 11. Success metrics
 
@@ -418,10 +491,11 @@ every P0 story it covers passes its acceptance criteria.
 | Milestone | Weeks (Assumption) | Covers | Exit gate |
 | --- | --- | --- | --- |
 | **M0 Foundations** | 1-3 | Monorepo, schema engine, tree storage, auth, command bus, audit | Content types defined in code produce types, validation and a stored, audited entry |
-| **M1 Editing core** | 4-10 | Admin app, tree UI, drafts, versions, publish, scheduling, media, roles, sites | **Gate 1:** the pilot site is fully modeled and edited by a real editor in staging |
-| **M2 Rendering and APIs** | 11-15 | Delivery API, SDK, starter, preview, cache purge, hooks, extensions, webhooks, tokens | **Gate 2:** the pilot site is live in production on the framework |
+| **M1 Editing core** | 4-10 | Move to one app on Supabase (Features 7-10), admin app, tree UI, drafts, versions, publish, scheduling, media, roles, sites | **Gate 1:** the pilot site is fully modeled and edited by a real editor in staging |
+| **M2 Rendering and APIs** | 11-15 | Website rendering in the app, Delivery API, SDK, create-base-app, preview, cache revalidation, hooks, extensions, webhooks, tokens, optional Railway worker | **Gate 2:** the pilot site is live in production on the framework |
 | **M3 AI pack and GA** | 16-21 | Bring-your-own keys, embeddings, search, assistants, MCP, AI budget, hardening, docs | **Gate 3 (v1 GA):** an agent drafts content over MCP that an editor approves and publishes; NFR targets met |
 | **M4 v1.1 Cloud, Team, apps** | +8 | G1-G7 | **Gate 4:** a paying customer runs on Cloud or the Team pack |
+| **M5 Scale pack** | after v1.1 (Assumption) | Standalone API server, Redis job workers, Clerk and S3/R2 adapters, Railway deploy, upgrade switch | **Gate 5:** a site moves from the default stack to the Scale pack by configuration, with no content or code changes |
 
 ## 13. Risks, decisions and open questions
 
@@ -436,19 +510,28 @@ every P0 story it covers passes its acceptance criteria.
 | Schema migrations corrupt content | Data loss | Immutable versions, dry-run migrations, daily backups |
 | AI output quality or cost | Editors stop trusting AI; margins shrink | Drafts only, Zod validation, budgets, route to Haiku where possible |
 | Solo founder running Cloud | On-call burden | Launch Cloud only after v1 is stable; managed infrastructure |
-| Clerk is a hosted dependency for an MIT self-hosted core | Friction for self-hosters | Auth adapter in v1; document a non-Clerk adapter early |
+| Supabase is a hosted dependency for an MIT self-hosted core | Friction for self-hosters | Plain Postgres works for data; auth and storage sit behind adapters; Supabase itself can be self-hosted |
+| Serverless request limits for jobs | Long jobs time out | Small idempotent jobs; `base worker` on Railway; Scale pack's Redis workers for heavy work |
+| Two stacks to maintain | Scale pack drifts from the default | Adapters with shared conformance suites; CI runs both adapter sets |
 
-**External dependencies and fallbacks:** Clerk (Auth.js or Lucia via adapter), Vercel
-(self-host Next.js on Railway), Railway (any Docker host + managed Postgres), Cloudflare
-R2 (S3-compatible adapter), Anthropic (provider adapter), Voyage AI (other provider plus a
-re-embed job).
+**External dependencies and fallbacks:** Supabase (self-hosted Supabase, or plain
+Postgres plus another auth and storage adapter), Vercel (Docker image on Railway or any
+Node host), Railway (optional; any long-running host for the worker and the Scale pack), Anthropic (provider
+adapter), Voyage AI (other provider plus a re-embed job).
 
 **Contradictions found while converting the PRD (decide, then update this plan)**
+
+- **Decided 2026-10-28 - One app on Supabase.** Website, admin and APIs ship as one
+  Next.js app on Supabase (Postgres, Auth, Storage, Cron). Fastify, Clerk, Redis/BullMQ
+  and R2 leave the default stack and return as the opt-in Scale pack for power users,
+  on Railway, behind the same adapters.
+- **TODO - Scale pack: free or paid?** It serves businesses with heavy sites (principle 5
+  keeps everything a solo developer needs free). Decide before M5.
 
 - **Decided - Bring-your-own-key for v1.** Sites run AI on their own provider keys; no
   license check or AI billing in v1. Hosted credits and the paid AI pack start in v1.1.
 - **Planned - Hosted AI credits** need a metered AI gateway (keys, metering, billing).
-  It is v1.1 Feature 54, after checkout and license keys (Feature 44).
+  It is v1.1 Feature 60, after checkout and license keys (Feature 50).
 - **TODO - Multi-site is free or paid?** D3 is a free v1 P0, yet the Team/Agency tier
   lists multi-site. Suggested reading: multi-site per install is free; multi-*tenant*
   SaaS is paid.
