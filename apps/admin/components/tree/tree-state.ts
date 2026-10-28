@@ -218,7 +218,10 @@ function isInside(state: TreeState, id: string | null, ancestor: string): boolea
 
 /** WAI-ARIA tree keyboard behaviour. Keys it does not handle leave the state unchanged. */
 function onKey(state: TreeState, key: string): TreeState {
-  const rows = visibleRows(state).filter((row) => row.kind !== "loading");
+  const all = visibleRows(state);
+  // While "Show more" or "Retry" loads, focus rests on its loading row: keys wait for it.
+  if (all.some((row) => row.id === state.focusedId && row.kind === "loading")) return state;
+  const rows = all.filter((row) => row.kind !== "loading");
   if (rows.length === 0) return state;
   const index = Math.max(
     0,

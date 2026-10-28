@@ -194,4 +194,23 @@ describe("tree state", () => {
     expect(state.selectedId).toBe("contact");
     expect(run(state, key("x"))).toBe(state);
   });
+
+  it("ignores keys while focus rests on a loading row, then moves to the first new page", () => {
+    let state = initialState([node("a", null), node("b", null)], "cursor-1");
+    state = run(state, key("End"), key("Enter"), { type: "loadStart", parent: ROOT });
+    expect(state.focusedId).toBe(statusId(ROOT));
+    for (const k of ["ArrowDown", "ArrowUp", "Home", "End", "Enter", " ", "ArrowLeft"]) {
+      expect(run(state, key(k))).toBe(state);
+    }
+    // The last page arrives: the status row goes away and focus lands on the first new page.
+    state = run(state, {
+      type: "loadSuccess",
+      parent: ROOT,
+      items: [node("c", null)],
+      nextCursor: null,
+    });
+    expect(ids(state)).toEqual(["a", "b", "c"]);
+    expect(state.focusedId).toBe("c");
+    expect(state.selectedId).toBeNull();
+  });
 });

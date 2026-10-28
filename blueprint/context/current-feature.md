@@ -98,6 +98,15 @@ be selected before `/complete`.
   the top level; tree-state tests cover keyboard activation of "Show more" and "Retry"
   and focus moving to the first new item; F-19 to F-22 are marked `fixed`; and
   `pnpm verify` passes.
+- [x] 7. **Repair review findings F-23 and F-22.** Keys pressed while focus rests on a
+  loading row do nothing; DOM focus follows the focused row after a load even when the
+  focused status row was removed; "Try again" on the error page calls Next 16's `retry()`.
+  Loading rows stay busy, disabled tree items rather than hidden ones, because keyboard
+  focus can rest on them while "Show more" or "Retry" loads (this replaces step 6's
+  "hidden from assistive tech").
+  **Done when:** tree-state tests prove ArrowDown, Enter and Space on a focused loading
+  row leave the state unchanged and that the last page moves focus to its first new page;
+  F-23 and F-21 are marked `fixed` and F-22 `fixed`; and `pnpm verify` passes.
 
 ## Files / areas
 
