@@ -403,9 +403,9 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
   Postgres 15+ works through `DATABASE_URL`.
 - Hosted Supabase (its own project; migrations 0008-0009 close all of `public` to the Data
   API roles): `DATABASE_URL` is the session pooler URL (port 5432) with
-  `?sslmode=verify-full&sslrootcert=<Supabase CA certificate file>`, never the transaction
-  pooler; turn off the Data API (or remove `public` from its exposed schemas) in the
-  dashboard.
+  `?sslmode=verify-full&sslrootcert=<absolute path to the Supabase CA certificate>` (a
+  relative path is read from each package's folder), never the transaction pooler; turn
+  off the Data API (or remove `public` from its exposed schemas) in the dashboard.
 - Database check: `pnpm db:doctor` reports migrations, whether the user can switch to
   `cms_app`, any Data API role privilege (table or column) and row-level security for
   `DATABASE_URL`, and exits non-zero on a failure.

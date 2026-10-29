@@ -52,6 +52,21 @@ describe("db:doctor", () => {
     }
   });
 
+  it("fails on a TRUNCATE grant", async () => {
+    await db.execute(
+      sql`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF; END $$`,
+    );
+    await db.execute(sql`GRANT TRUNCATE ON sites TO anon`);
+    try {
+      expect((await byName())["api roles"]).toMatchObject({
+        ok: false,
+        detail: "privileges granted: anon on sites",
+      });
+    } finally {
+      await db.execute(sql`REVOKE TRUNCATE ON sites FROM anon`);
+    }
+  });
+
   it("fails the role check for a user who cannot switch to cms_app", async () => {
     const role = `doctor_probe_${process.pid}`;
     await db.execute(sql.raw(`CREATE ROLE ${role} LOGIN PASSWORD 'probe-password'`));
@@ -62,6 +77,30 @@ describe("db:doctor", () => {
     try {
       const checks = Object.fromEntries((await runDoctor(probe.db)).map((c) => [c.name, c]));
       expect(checks.role).toMatchObject({ ok: false });
+    } finally {
+      await probe.pool.end();
+      await db.execute(sql.raw(`DROP ROLE ${role}`));
+    }
+  });
+
+  // withSite() needs SET LOCAL ROLE, so plain membership is not enough on PostgreSQL 16+.
+  it("fails the role check for a member without SET (PostgreSQL 16+ only)", async ({ skip }) => {
+    const { rows } = await db.execute<{ v: string }>(
+      sql`SELECT current_setting('server_version_num') AS v`,
+    );
+    if (Number(rows[0]?.v) < 160000) skip("GRANT ... WITH SET needs PostgreSQL 16+");
+    const role = `doctor_set_${process.pid}`;
+    await db.execute(sql.raw(`CREATE ROLE ${role} LOGIN PASSWORD 'probe-password'`));
+    const url = new URL(process.env.TEST_DATABASE_URL ?? "");
+    url.username = role;
+    url.password = "probe-password";
+    const probe = createDb(url.toString());
+    const roleOk = async () => (await runDoctor(probe.db)).find((c) => c.name === "role")?.ok;
+    try {
+      await db.execute(sql.raw(`GRANT cms_app TO ${role} WITH SET FALSE`));
+      expect(await roleOk()).toBe(false);
+      await db.execute(sql.raw(`GRANT cms_app TO ${role} WITH SET TRUE`));
+      expect(await roleOk()).toBe(true);
     } finally {
       await probe.pool.end();
       await db.execute(sql.raw(`DROP ROLE ${role}`));
