@@ -64,12 +64,14 @@ shared project would stop working.
 1. Turn off the Data API (Project settings > Data API), or remove `public` from its
    exposed schemas.
 2. Download the database's CA certificate (Database settings > SSL configuration) and keep
-   it next to the app, for example `certs/supabase-ca.crt` (it is public, not a secret).
+   it somewhere on the machine, for example `/home/you/certs/supabase-ca.crt` (it is public,
+   not a secret).
 3. Set `DATABASE_URL` to the **session pooler** URL (Connect > Session pooler, port 5432)
-   plus `?sslmode=verify-full&sslrootcert=certs/supabase-ca.crt`. The `pg` driver treats a
-   bare `sslmode=require` as `verify-full` too, and without the CA certificate the
-   connection can fail certificate checks. The transaction pooler (port 6543) is not
-   supported.
+   plus `?sslmode=verify-full&sslrootcert=/home/you/certs/supabase-ca.crt`. Use an
+   absolute path: the scripts run from each package's folder, so a relative path is read
+   from there and fails with `ENOENT`. The `pg` driver treats a bare `sslmode=require` as
+   `verify-full` too, and without the CA certificate the connection can fail certificate
+   checks. The transaction pooler (port 6543) is not supported.
 4. Run `pnpm db:migrate`, then `pnpm db:doctor`: every line should read `ok`. If it cannot
    connect, it prints the driver's reason (for example a certificate or password error).
 
