@@ -154,6 +154,27 @@ independent review will be selected before `/complete`.
 
   **Done when:** `pnpm verify` passes and there is no migration drift.
 
+- [x] 6. **Repair: Vercel build order and review findings F-37 to F-39.**
+  - `apps/web/vercel.json` sets the build command to
+    `cd ../.. && pnpm turbo run build --filter=@cms/web`, so Turborepo builds `@cms/db`
+    and `@cms/http` before `next build` (their `dist/` is not committed). README and
+    AGENTS.md say so.
+  - F-37: `queryObject` uses a null-prototype object, so `__proto__` is an ordinary unknown
+    key (400 `invalid_input`).
+  - F-38: the catch-all route also exports OPTIONS and HEAD, so every method reaches
+    `handleApi`.
+  - F-39: the Fastify host stops parsing bodies (`removeAllContentTypeParsers` plus a
+    catch-all parser that leaves the body alone), so a POST with any body gets the same 405
+    as `handleApi`.
+
+  **Done when:**
+  - tests cover `?__proto__=x` (400) and a Fastify POST with invalid JSON and with
+    `application/xml` (405 `method_not_allowed`);
+  - `vercel.json` is valid JSON, and the build command, run from `apps/web` after deleting
+    the `dist/` folders of `@cms/db` and `@cms/http`, rebuilds them and the app;
+  - F-37 to F-39 are marked `fixed`;
+  - `pnpm verify` passes.
+
 ## Files / areas
 
 - `packages/http/` (new): `package.json`, `tsconfig*.json`, `vitest.config.ts`,

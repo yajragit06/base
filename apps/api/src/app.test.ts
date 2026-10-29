@@ -63,5 +63,20 @@ describe("Fastify host", () => {
     const wrong = await app.inject({ method: "POST", url: "/api/me", headers: bearer });
     expect(wrong.statusCode).toBe(405);
     expect(wrong.headers.allow).toBe("GET");
+    // Bodies are not parsed, so any body still gets handleApi's 405.
+    for (const [type, payload] of [
+      ["application/json", "{not json"],
+      ["application/xml", "<a/>"],
+    ]) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/healthz",
+        headers: { "content-type": type },
+        payload,
+      });
+      expect(res.statusCode, type).toBe(405);
+      expect(res.json()).toEqual({ error: "method_not_allowed" });
+      expect(res.headers["cache-control"]).toBe("no-store");
+    }
   });
 });

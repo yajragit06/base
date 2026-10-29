@@ -444,6 +444,8 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
   log. The Fastify host needs `DATABASE_URL` and `CLERK_SECRET_KEY` and refuses to start
   without them.
 - Vercel: the project's root directory is `apps/web`, with the app env above.
+  `apps/web/vercel.json` builds through Turborepo (`pnpm turbo run build --filter=@cms/web`),
+  so `@cms/db` and `@cms/http` are built first.
 - Verify: `pnpm verify` (typecheck, lint, test, then build)
 - New site: `pnpm --filter @cms/api create-site -- --name <name> --time-zone <Area/City>
   --locale <tag> --owner-email <email>` (system only; the owner must have signed in once)

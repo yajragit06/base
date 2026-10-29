@@ -57,7 +57,8 @@ function match(segments: string[]) {
 }
 
 function queryObject(url: URL): Record<string, string> | null {
-  const query: Record<string, string> = {};
+  // No prototype, so `__proto__` is an ordinary key that the strict schemas reject.
+  const query: Record<string, string> = Object.create(null);
   for (const [key, value] of url.searchParams) {
     if (Object.hasOwn(query, key)) return null;
     query[key] = value;

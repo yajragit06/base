@@ -60,7 +60,9 @@ Database tests need `TEST_DATABASE_URL` exported (a disposable database). The ap
 
 Set the Vercel project's root directory to `apps/web`, and add `DATABASE_URL` (the Supabase
 session pooler URL below), `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
-`NEXT_PUBLIC_CLERK_SIGN_IN_URL=/admin/sign-in`. No separate API server is needed. `AGENTS.md` has the full command list and the project rules.
+`NEXT_PUBLIC_CLERK_SIGN_IN_URL=/admin/sign-in`. No separate API server is needed.
+`apps/web/vercel.json` sets the build command, so Turborepo builds the shared packages
+before the app; keep "Include files outside the root directory" on. `AGENTS.md` has the full command list and the project rules.
 
 ### Supabase
 

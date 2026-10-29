@@ -7,6 +7,10 @@ import Fastify, { type FastifyServerOptions } from "fastify";
  */
 export function buildApp(deps: ApiDeps, opts: FastifyServerOptions = {}) {
   const app = Fastify(opts);
+  // No route reads a body yet, so leave bodies unparsed: every request reaches handleApi,
+  // which answers the same as on the Next.js host.
+  app.removeAllContentTypeParsers();
+  app.addContentTypeParser("*", (_request, _payload, done) => done(null));
 
   app.all("/api/*", async (request, reply) => {
     const headers = new Headers();

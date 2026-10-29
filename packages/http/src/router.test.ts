@@ -56,7 +56,7 @@ describe("handleApi", () => {
     expect(errors).toEqual([new Error("secret detail")]);
   });
 
-  it("rejects a repeated query parameter as invalid input", async () => {
+  it("rejects a repeated or prototype-named query parameter as invalid input", async () => {
     const site = await createSite(db, {
       name: "A",
       timeZone: "UTC",
@@ -82,6 +82,15 @@ describe("handleApi", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: "invalid_input" });
+    for (const q of ["__proto__=x", "__proto__=x&__proto__=y", "constructor=x"]) {
+      const bad = await inject({
+        method: "GET",
+        url: `/api/sites/${site.id}/tree?${q}`,
+        headers: bearer,
+      });
+      expect(bad.statusCode, q).toBe(400);
+      expect(bad.json()).toEqual({ error: "invalid_input" });
+    }
   });
 
   it("marks every answer JSON and not cacheable", async () => {
