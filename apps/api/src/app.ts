@@ -1,23 +1,29 @@
-import type { Db } from "@cms/db";
+import { type ApiDeps, handleApi } from "@cms/http";
 import Fastify, { type FastifyServerOptions } from "fastify";
-import type { AuthAdapter } from "./auth.js";
-import { meRoutes } from "./routes/me.js";
-import { treeRoutes } from "./routes/tree.js";
 
-export interface AppDeps {
-  db: Db;
-  auth: AuthAdapter;
-}
-
-/** Builds the API without listening, so tests can use `app.inject`. */
-export function buildApp(deps: AppDeps, opts: FastifyServerOptions = {}) {
+/**
+ * The Scale pack's API host: Fastify serves the same `@cms/http` handlers as the Next.js
+ * app, without listening, so tests can use `app.inject`.
+ */
+export function buildApp(deps: ApiDeps, opts: FastifyServerOptions = {}) {
   const app = Fastify(opts);
-  app.decorateRequest("user", null);
-  app.decorateRequest("membership", null);
 
-  app.get("/healthz", async () => ({ ok: true }));
-  meRoutes(app, deps.db, deps.auth);
-  treeRoutes(app, deps.db, deps.auth);
+  app.all("/api/*", async (request, reply) => {
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(request.headers)) {
+      if (Array.isArray(value)) for (const v of value) headers.append(name, v);
+      else if (value !== undefined) headers.set(name, value);
+    }
+    const response = await handleApi(
+      new Request(new URL(request.url, "http://localhost"), { method: request.method, headers }),
+      deps,
+    );
+    reply.code(response.status);
+    response.headers.forEach((value, name) => {
+      reply.header(name, value);
+    });
+    return reply.send(await response.text());
+  });
 
   return app;
 }

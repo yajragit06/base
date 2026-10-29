@@ -24,9 +24,11 @@ live in separate packages, and the core never depends on them.
 
 ## Layout
 
-- `apps/api` Fastify API: sign-in through an auth adapter (Clerk today), `GET /me`, and a
+- `apps/web` the Next.js app: the admin at `/admin` and the API at `/api`, in one deploy.
+- `packages/http` the API, written once against web-standard `Request`/`Response`, with
+  sign-in through an auth adapter (Clerk today): `GET /api/me` and the page tree.
+- `apps/api` an optional Fastify host for the same API (the Scale pack), and the
   `create-site` script for new sites.
-- `apps/admin` Next.js admin app.
 - `packages/schema` `defineContentType()`, the field builders and `validateEntry()`.
 - `packages/db` Drizzle schema and migrations: sites, domains, the entry tree, users,
   memberships and the append-only audit log, isolated per site with row-level security.
@@ -45,14 +47,20 @@ pnpm db:start        # local Supabase (needs Docker); or point DATABASE_URL at a
 pnpm db:migrate      # apply migrations
 pnpm db:doctor       # check the database is ready and closed to Supabase's Data API
 pnpm db:create-test  # create the disposable test database (TEST_DATABASE_URL)
-pnpm dev             # api on :4000 (GET /healthz), admin on :3000
+pnpm dev             # the app on :3000: admin at /admin, API at /api (GET /api/healthz)
 pnpm verify          # typecheck, lint, test, build (CI runs the same plus migrations)
 pnpm db:generate     # after editing packages/db/src/schema.ts; commit the migration
 pnpm format          # Biome format and safe lint fixes
 ```
 
-Database tests need `TEST_DATABASE_URL` exported (a disposable database), and the API
-needs `CLERK_SECRET_KEY`. `AGENTS.md` has the full command list and the project rules.
+Database tests need `TEST_DATABASE_URL` exported (a disposable database). The app needs
+`DATABASE_URL` and the Clerk keys from `.env.example`.
+
+### Vercel
+
+Set the Vercel project's root directory to `apps/web`, and add `DATABASE_URL` (the Supabase
+session pooler URL below), `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
+`NEXT_PUBLIC_CLERK_SIGN_IN_URL=/admin/sign-in`. No separate API server is needed. `AGENTS.md` has the full command list and the project rules.
 
 ### Supabase
 

@@ -1,7 +1,7 @@
 # Coding Standards
 
 > Tuned by `/onboard` to this repository: a pnpm + Turborepo TypeScript monorepo with a
-> Fastify API, a Next.js admin app and Drizzle on PostgreSQL. Edit freely as conventions
+> Next.js app (admin and API), a shared web-standard API package and Drizzle on PostgreSQL. Edit freely as conventions
 > settle; `TODO` marks choices the code has not made yet.
 
 ## TypeScript
@@ -21,16 +21,19 @@
   `typecheck` and (if it has logic) `test` scripts so Turborepo picks it up
 - The core never imports paid `ee-*` packages; they plug into extension points
 
-## API (Fastify)
+## API (`@cms/http`)
 
-- `buildApp(deps)` in `apps/api/src/app.ts` builds the app from injected dependencies
-  without listening; `server.ts` wires real services and listens
-- Routes live in `apps/api/src/routes/`, one file per area, registered from `buildApp`
+- The API is written once in `packages/http` against web-standard `Request`/`Response`:
+  `handleApi(request, deps)` takes injected `{ db, auth }`. The Next.js route handler,
+  server components (in-process) and the Scale pack's Fastify host all call it
+- Routes live in `packages/http/src/routes/`, one file per area, registered in
+  `src/router.ts`; answer with `json(status, body)`
 - Every write goes through a typed command: Zod input, permission check, audit entry in
   the same transaction (see the rules in `AGENTS.md`)
 - Validate every request body, query and param with Zod; return field-level errors
   as `400` with a stable shape
-- Errors: throw typed HTTP errors; never leak stack traces or secrets in responses
+- Errors: return a stable `{ error: code }`; unexpected errors become 500
+  `internal_error`. Never leak stack traces, messages or secrets in responses
 
 ## Database (Drizzle)
 
@@ -43,10 +46,11 @@
 - Money-like or very large integers are never converted with `Number()`
 - Inserts that may repeat (jobs, webhooks) use `onConflictDoNothing` on a dedupe key
 
-## Admin app (Next.js)
+## Web app (Next.js)
 
 - App Router, server components by default; `'use client'` only for interactivity
-- Server components call the API (never the database directly for tenant data)
+- Server components call the API in-process through `lib/api.ts` (never the database
+  directly for tenant data)
 - Styling and component kit: `TODO` (shadcn/ui suggested in the plan). No inline styles
   once it is chosen
 - Rich text editor: `TODO` (Tiptap or Lexical), stored as structured JSON

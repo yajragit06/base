@@ -21,11 +21,48 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  apps/admin:
+  apps/api:
+    dependencies:
+      '@cms/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@cms/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@cms/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      fastify:
+        specifier: ^5.12.7
+        version: 5.12.7
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  apps/web:
     dependencies:
       '@clerk/nextjs':
         specifier: 7.9.21
         version: 7.9.21(next@16.4.3(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@cms/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@cms/http':
+        specifier: workspace:*
+        version: link:../../packages/http
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -69,40 +106,6 @@ importers:
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^5.0.5
-        version: 5.0.5(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-
-  apps/api:
-    dependencies:
-      '@clerk/backend':
-        specifier: 3.26.3
-        version: 3.26.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@cms/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@cms/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      fastify:
-        specifier: ^5.12.7
-        version: 5.12.7
-      zod:
-        specifier: ^4.6.7
-        version: 4.6.7
-    devDependencies:
-      '@types/node':
-        specifier: ^22.20.5
-        version: 22.20.5
-      drizzle-orm:
-        specifier: ^0.45.4
-        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
-      tsx:
-        specifier: ^4.23.15
-        version: 4.23.15
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -156,6 +159,31 @@ importers:
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/http:
+    dependencies:
+      '@clerk/backend':
+        specifier: 3.26.3
+        version: 3.26.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@cms/db':
+        specifier: workspace:*
+        version: link:../db
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

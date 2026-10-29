@@ -50,8 +50,9 @@ export {
 } from "./versions.js";
 export { schema };
 
-export function createDb(connectionString: string) {
-  const pool = new pg.Pool({ connectionString });
+/** `max` caps the pool's connections, for example on serverless hosts. */
+export function createDb(connectionString: string, options: { max?: number } = {}) {
+  const pool = new pg.Pool({ connectionString, ...options });
   return { db: drizzle(pool, { schema }), pool };
 }
 

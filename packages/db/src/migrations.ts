@@ -1,9 +1,12 @@
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type pg from "pg";
 import type { Db } from "./index.js";
 
-export const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
+// Built from path parts rather than `new URL("../drizzle", import.meta.url)`, which bundlers
+// such as Turbopack try to resolve as an asset when the web app imports this package.
+export const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
 
 export function runMigrations(db: Db): Promise<void> {
   return migrate(db, { migrationsFolder });

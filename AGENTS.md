@@ -22,21 +22,35 @@ order are in `blueprint/context/project-overview.md`; the full plan is
 
 ### Layout
 
-- `apps/api` Fastify API. `src/app.ts` builds the app from injected `{ db, auth }`
-  (`buildApp`, testable with `app.inject` and a fake `AuthAdapter`); `src/server.ts` wires
-  Postgres and Clerk. `src/auth.ts` holds the `AuthAdapter` interface, the Clerk adapter and
-  `requireUser`, which turns `Authorization: Bearer <token>` into `request.user` or a 401,
-  and `requireSiteMember`, which guards `/sites/:siteId/...` routes (404 for a malformed id,
-  403 for anyone without a role on the site, so site existence never leaks). Routes live in
-  `src/routes/`: `GET /me`, and `GET /sites/:siteId/tree?parentId=&after=&limit=` (one page
-  of children with `hasChildren`, any role; `listChildrenPage` in `@cms/db`).
-- `apps/admin` Next.js (App Router) admin app: Clerk sign-in (`proxy.ts` protects every page
-  but `/sign-in`), shadcn/ui components with Tailwind CSS 4 (`components/ui`, add only what
-  a screen uses), and the shell under `/sites/[siteId]` with the site switcher and the page
-  tree (`components/tree`; its state and keyboard logic is pure and unit-tested). Admin
-  URLs carry the site: `/sites/:siteId/...`. Server components and server actions call the
-  API through `lib/api.ts` with the Clerk session token; the admin never reads the
-  database, and the token never reaches client JavaScript.
+- `apps/web` the one Next.js (App Router) app. The admin is under `/admin`, with Clerk
+  sign-in at `/admin/sign-in` (`proxy.ts` protects every `/admin` page but sign-in). It uses
+  shadcn/ui components with Tailwind CSS 4 (`components/ui`, add only what a screen uses).
+  The shell under `/admin/sites/[siteId]` has the site switcher and the page tree
+  (`components/tree`; its state and keyboard logic is pure and unit-tested). The API is
+  served at `/api` by `app/api/[...path]/route.ts`, which passes every request to
+  `handleApi`. `/` redirects to `/admin` until Feature 24 renders the public site there.
+  Server components and server actions call the API in-process through `lib/api.ts`
+  (`callApi` in `lib/api-core.ts`) with the Clerk session token: no HTTP hop, and the token
+  never reaches client JavaScript. `lib/server-deps.ts` builds the database pool (at most 5
+  connections) and the auth adapter once per server instance, on first use.
+- `packages/http` the API, written once against web-standard `Request`/`Response`:
+  `handleApi(request, { db, auth, onError })` routes `GET /api/healthz`, `GET /api/me`
+  and `GET /api/sites/:siteId/tree?parentId=&after=&limit=` (one page of children with
+  `hasChildren`, any role; `listChildrenPage` in `@cms/db`). Answers are JSON with
+  `cache-control: no-store`. An unknown path is 404 `not_found`; another method on a known
+  path is 405 with `Allow`; a repeated or unknown query parameter is 400 `invalid_input`; an
+  unexpected error is 500 `internal_error`, with the error passed to `onError`, never into
+  the body. `src/auth.ts` holds the `AuthAdapter` interface, the Clerk adapter, and two
+  checks:
+  - `requireUser`, which turns `Authorization: Bearer <token>` into a user or a 401 response;
+  - `requireSiteMember`, which answers 404 for a malformed site id and 403 for anyone
+    without a role on the site, so site existence never leaks.
+
+  Routes live in `src/routes/`, registered in `src/router.ts`.
+- `apps/api` the Scale pack's Fastify host. It forwards every `/api/*` request to
+  `handleApi` and is not part of the default deploy. `buildApp` is testable with
+  `app.inject`; `src/server.ts` wires Postgres and Clerk. It also holds the system-only
+  `create-site` script.
 - `packages/db` Drizzle schema (`src/schema.ts`), migrations in `drizzle/`, `createDb`;
   sites and domains (`sites.ts`), the entry tree (`entries.ts`), immutable versions
   (`versions.ts`: one linear chain per entry and locale, the latest is the one nothing is
@@ -409,22 +423,27 @@ pnpm 9 workspaces with Turborepo. Copy `.env.example` to `.env` first.
 - Database check: `pnpm db:doctor` reports migrations, whether the user can switch to
   `cms_app`, any Data API role privilege (table or column) and row-level security for
   `DATABASE_URL`, and exits non-zero on a failure.
-- Dev servers: `pnpm dev` (API http://localhost:4000, `GET /healthz`; admin http://localhost:3000)
+- Dev server: `pnpm dev` (the app at http://localhost:3000: admin `/admin`, API `/api`,
+  `GET /api/healthz`). The Scale pack's Fastify host: `pnpm --filter @cms/api dev:fastify`
+  (http://localhost:4000, same `/api` routes).
 - Build: `pnpm build`
-- Production servers: `pnpm --filter @cms/api start`, `pnpm --filter @cms/admin start`
+- Production server: `pnpm --filter @cms/web start` (Fastify host: `pnpm --filter @cms/api start`)
 - Typecheck: `pnpm typecheck`
 - Lint: `pnpm lint` (Biome); format and safe fixes: `pnpm format`
-- Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db`, `@cms/core` and `@cms/api`
+- Test: `pnpm test` (Vitest; suites run one at a time). `@cms/db`, `@cms/core`, `@cms/http` and `@cms/api`
   tests need `TEST_DATABASE_URL` exported (a disposable database: tests truncate every
   table; create it with `pnpm db:create-test`) and a database user allowed to create roles
   and databases.
 - Database user: the app must connect as the same user that runs `pnpm db:migrate`; the
   migration grants the `cms_app` role (needed by `withSite()` and `withUser()`) only to
   that user.
-- API env: `CLERK_SECRET_KEY` is required; the API refuses to start without it.
-- Admin env: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the same Clerk
-  instance, `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, and `API_URL` (default
-  `http://localhost:4000`). The admin builds without them; pages render per request.
+- App env (`apps/web`): `DATABASE_URL`, plus `CLERK_SECRET_KEY` and
+  `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from the same Clerk instance, and
+  `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/admin/sign-in`. The app builds without them. The first
+  API call or admin page that needs one fails, naming the missing variable in the server
+  log. The Fastify host needs `DATABASE_URL` and `CLERK_SECRET_KEY` and refuses to start
+  without them.
+- Vercel: the project's root directory is `apps/web`, with the app env above.
 - Verify: `pnpm verify` (typecheck, lint, test, then build)
 - New site: `pnpm --filter @cms/api create-site -- --name <name> --time-zone <Area/City>
   --locale <tag> --owner-email <email>` (system only; the owner must have signed in once)

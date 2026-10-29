@@ -1,6 +1,6 @@
 import { createDb } from "@cms/db";
+import { clerkAuthAdapter, clerkCalls } from "@cms/http";
 import { buildApp } from "./app.js";
-import { clerkAuthAdapter, clerkCalls } from "./auth.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
